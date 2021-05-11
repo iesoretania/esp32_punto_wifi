@@ -4,32 +4,29 @@
 #include <SPI.h>
 #include <TFT_eSPI.h>
 
-#define screenWidth 480
-#define screenHeight 320
+#define SCREEN_WIDTH 480
+#define SCREEN_HEIGHT 320
 
 TFT_eSPI tft = TFT_eSPI();
-static lv_disp_draw_buf_t disp_buf;
-static lv_color_t buf1[LV_HOR_RES_MAX * 20];
-static lv_color_t buf2[LV_HOR_RES_MAX * 20];
 
 /* Flushing en el display */
-void my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p)
+void espi_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p)
 {
     uint32_t w = (area->x2 - area->x1 + 1);
     uint32_t h = (area->y2 - area->y1 + 1);
 
     tft.startWrite();
     tft.setAddrWindow(area->x1, area->y1, w, h);
-    tft.pushColors(&color_p->full, w * h, true);    // importante que swap sea true en este display
+    tft.pushColors(&color_p->full, w * h, false);    // importante que swap sea true en este display
     tft.endWrite();
 
     lv_disp_flush_ready(disp);
 }
 
 // Pantallas
-lv_obj_t *scrSplash;     // Pantalla de inicio (splash screen)
-lv_obj_t *scrMain;     // Pantalla principal de lectura de código
-lv_obj_t *scrConfig;     // Pantalla de configuración
+static lv_obj_t *scrSplash;     // Pantalla de inicio (splash screen)
+static lv_obj_t *scrMain;     // Pantalla principal de lectura de código
+static lv_obj_t *scrConfig;     // Pantalla de configuración
 
 void setup() {
 
@@ -41,6 +38,7 @@ void setup() {
     // Activar iluminación del display al 100%
     pinMode(BACKLIGHT_PIN, OUTPUT);
     ledcAttachPin(BACKLIGHT_PIN, 1);
+    ledcSetup(1, 5000, 8);
     ledcWrite(1, 255);
 
     // Inicializar bus SPI y el TFT conectado a través de él
@@ -48,19 +46,24 @@ void setup() {
     tft.begin();            /* Inicializar TFT */
     tft.setRotation(3);     /* Orientación horizontal */
 
+    lv_init();
+
     // Inicializar buffers del GUI
+    static lv_disp_draw_buf_t disp_buf;
+    static lv_color_t buf1[LV_HOR_RES_MAX * 20];
+    static lv_color_t buf2[LV_HOR_RES_MAX * 20];
+
     lv_disp_draw_buf_init(&disp_buf, buf1, buf2, LV_HOR_RES_MAX * 20);
 
     // Inicializar interfaz gráfica
-    lv_disp_drv_t disp_drv;
+    static lv_disp_drv_t disp_drv;
     lv_disp_drv_init(&disp_drv);
-    disp_drv.hor_res = 480;
-    disp_drv.ver_res = 320;
-    disp_drv.flush_cb = my_disp_flush;
+    disp_drv.hor_res = SCREEN_WIDTH;
+    disp_drv.ver_res = SCREEN_HEIGHT;
+    disp_drv.antialiasing = 1;
+    disp_drv.flush_cb = espi_disp_flush;
     disp_drv.draw_buf = &disp_buf;
     lv_disp_drv_register(&disp_drv);
-
-    lv_init();
 
     // CREAR PANTALLA DE ARRANQUE (splash screen)
     scrSplash = lv_obj_create(nullptr, nullptr);
