@@ -39,6 +39,7 @@ static lv_obj_t * lbl_estado_splash;
 static lv_obj_t * scr_main;       // Pantalla principal de lectura de código
 static lv_obj_t * lbl_hora_main;
 static lv_obj_t * lbl_fecha_main;
+static lv_obj_t * lbl_estado_main;
 
 static lv_obj_t * scr_config;     // Pantalla de configuración
 
@@ -88,6 +89,16 @@ void set_fecha_main_format(const char * string, const char * p) {
 void set_fecha_main(const char * string) {
     lv_label_set_text(lbl_fecha_main, string);
     lv_obj_align(lbl_fecha_main, lbl_hora_main, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
+}
+
+void set_estado_main_format(const char * string, const char * p) {
+    lv_label_set_text_fmt(lbl_fecha_main, string, p);
+    lv_obj_align(lbl_fecha_main, lbl_hora_main, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
+}
+
+void set_estado_main(const char * string) {
+    lv_label_set_text(lbl_estado_main, string);
+    lv_obj_align(lbl_estado_main, nullptr, LV_ALIGN_CENTER, 0, 10);
 }
 
 void task_wifi_connection(lv_timer_t * timer) {
@@ -155,6 +166,7 @@ void task_wifi_connection(lv_timer_t * timer) {
 }
 
 void task_main(lv_timer_t * timer) {
+    char *dia_semana[] = { "Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado" };
     static enum { IDLE, DONE, NO_NETWORK } state = IDLE;
     static int cuenta = 0;
     static HTTPClient client;
@@ -162,6 +174,7 @@ void task_main(lv_timer_t * timer) {
 
     time_t now;
     char strftime_buf[64];
+    char fecha_final[64];
     struct tm timeinfo;
 
     switch (state) {
@@ -169,6 +182,7 @@ void task_main(lv_timer_t * timer) {
             lv_timer_del(timer);
             return;
         case IDLE:
+            cuenta++;
             if (WiFi.status() != WL_CONNECTED) {
                 state = NO_NETWORK;
             } else {
@@ -179,7 +193,21 @@ void task_main(lv_timer_t * timer) {
                 set_hora_main(strftime_buf);
 
                 strftime(strftime_buf, sizeof(strftime_buf), "%d/%m/%G", &timeinfo);
-                set_fecha_main(strftime_buf);
+                strcpy(fecha_final, dia_semana[timeinfo.tm_wday]);
+                strcat(fecha_final, ", ");
+                strcat(fecha_final, strftime_buf);
+                set_fecha_main(fecha_final);
+
+                switch ((cuenta / 40) % 3) {
+                    case 0:
+                        set_estado_main("Acerque llavero...");
+                        break;
+                    case 1:
+                        set_estado_main("Pulse pantalla para PIN");
+                        break;
+                    case 2:
+                        set_estado_main("CODIGO QR AQUI");
+                }
             }
             break;
         case NO_NETWORK:
@@ -299,9 +327,17 @@ void create_scr_main() {
     lv_obj_set_style_text_align(lbl_hora_main, LV_PART_MAIN, LV_STATE_DEFAULT, LV_TEXT_ALIGN_CENTER);
     lbl_fecha_main = lv_label_create(scr_main, nullptr);
     lv_obj_set_style_text_font(lbl_fecha_main, LV_PART_MAIN, LV_STATE_DEFAULT, &lv_font_montserrat_24);
+    lv_obj_set_style_text_color(lbl_estado_main, LV_PART_MAIN, LV_STATE_DEFAULT, lv_color_get_palette_main(LV_COLOR_PALETTE_GREY));
     lv_obj_set_style_text_align(lbl_fecha_main, LV_PART_MAIN, LV_STATE_DEFAULT, LV_TEXT_ALIGN_CENTER);
     set_hora_main("");
     set_fecha_main("");
+
+    // Etiqueta de estado centrada en pantalla
+    lbl_estado_main = lv_label_create(scr_main, nullptr);
+    lv_obj_set_style_text_font(lbl_estado_main, LV_PART_MAIN, LV_STATE_DEFAULT, &lv_font_montserrat_24);
+    lv_obj_set_style_text_color(lbl_estado_main, LV_PART_MAIN, LV_STATE_DEFAULT, lv_color_get_palette_main(LV_COLOR_PALETTE_BLUE_GREY));
+    lv_obj_set_style_text_align(lbl_estado_main, LV_PART_MAIN, LV_STATE_DEFAULT, LV_TEXT_ALIGN_CENTER);
+    set_estado_main("");
 }
 
 void loop() {
