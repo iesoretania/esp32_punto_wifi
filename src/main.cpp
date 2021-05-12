@@ -1,5 +1,7 @@
 #include <Arduino.h>
 
+#include <punto_control.h>
+
 #include <lvgl.h>
 #include <SPI.h>
 #include <TFT_eSPI.h>
@@ -138,6 +140,13 @@ void create_scr_splash() {
     lv_obj_set_style_text_font(lbl_estado_splash, LV_PART_MAIN, LV_STATE_DEFAULT, &lv_font_montserrat_24);
     lv_obj_set_style_text_align(lbl_estado_splash, LV_PART_MAIN, LV_STATE_DEFAULT, LV_TEXT_ALIGN_CENTER);
     set_estado_splash("Inicializando...");
+
+    // Etiqueta de versión del software en la esquina inferior izquierda
+    lv_obj_t * lbl_version = lv_label_create(scr_splash, nullptr);
+    lv_obj_set_style_text_font(lbl_version, LV_PART_MAIN, LV_STATE_DEFAULT, &lv_font_montserrat_14);
+    lv_obj_set_style_text_align(lbl_version, LV_PART_MAIN, LV_STATE_DEFAULT, LV_TEXT_ALIGN_LEFT);
+    lv_label_set_text(lbl_version, PUNTO_CONTROL_VERSION);
+    lv_obj_align(lbl_version, nullptr, LV_ALIGN_IN_BOTTOM_LEFT, 10, -10);
 }
 
 void loop() {
