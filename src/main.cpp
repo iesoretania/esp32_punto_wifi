@@ -92,8 +92,8 @@ void set_fecha_main(const char * string) {
 }
 
 void set_estado_main_format(const char * string, const char * p) {
-    lv_label_set_text_fmt(lbl_fecha_main, string, p);
-    lv_obj_align(lbl_fecha_main, lbl_hora_main, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
+    lv_label_set_text_fmt(lbl_estado_main, string, p);
+    lv_obj_align(lbl_estado_main, nullptr, LV_ALIGN_CENTER, 0, 10);
 }
 
 void set_estado_main(const char * string) {
@@ -292,19 +292,19 @@ void create_scr_splash() {
 
     // Etiqueta de estado actual centrada en la parte superior
     lbl_estado_splash = lv_label_create(scr_splash, nullptr);
-    lv_obj_set_style_text_font(lbl_estado_splash, LV_PART_MAIN, LV_STATE_DEFAULT, &lv_font_montserrat_24);
+    lv_obj_set_style_text_font(lbl_estado_splash, LV_PART_MAIN, LV_STATE_DEFAULT, &mulish_24);
     lv_obj_set_style_text_align(lbl_estado_splash, LV_PART_MAIN, LV_STATE_DEFAULT, LV_TEXT_ALIGN_CENTER);
     set_estado_splash("Inicializando...");
 
     // Etiqueta de dirección IP actual centrada en la parte inferior
     lbl_ip_splash = lv_label_create(scr_splash, nullptr);
-    lv_obj_set_style_text_font(lbl_ip_splash, LV_PART_MAIN, LV_STATE_DEFAULT, &lv_font_montserrat_18);
+    lv_obj_set_style_text_font(lbl_ip_splash, LV_PART_MAIN, LV_STATE_DEFAULT, &mulish_16);
     lv_obj_set_style_text_align(lbl_ip_splash, LV_PART_MAIN, LV_STATE_DEFAULT, LV_TEXT_ALIGN_CENTER);
     set_ip_splash("Esperando configuración");
 
     // Etiqueta de versión del software en la esquina inferior izquierda
     lv_obj_t * lbl_version = lv_label_create(scr_splash, nullptr);
-    lv_obj_set_style_text_font(lbl_version, LV_PART_MAIN, LV_STATE_DEFAULT, &lv_font_montserrat_14);
+    lv_obj_set_style_text_font(lbl_version, LV_PART_MAIN, LV_STATE_DEFAULT, &mulish_16);
     lv_obj_set_style_text_align(lbl_version, LV_PART_MAIN, LV_STATE_DEFAULT, LV_TEXT_ALIGN_LEFT);
     lv_label_set_text(lbl_version, PUNTO_CONTROL_VERSION);
     lv_obj_align(lbl_version, nullptr, LV_ALIGN_IN_BOTTOM_LEFT, 10, -10);
@@ -316,25 +316,20 @@ void create_scr_main() {
     scr_main = lv_obj_create(nullptr, nullptr);
     lv_obj_set_style_bg_color(scr_main, 0, LV_STATE_DEFAULT, LV_COLOR_MAKE(255, 255, 255));
 
-    // Spinner para indicar operación en progreso en la esquina inferior derecha
-    lv_obj_t * spinner = lv_spinner_create(scr_splash, 1000, 45);
-    lv_obj_set_size(spinner, 50, 50);
-    lv_obj_align(spinner, nullptr, LV_ALIGN_IN_BOTTOM_RIGHT, -10, -10);
-
     // Etiqueta de hora y fecha actual centrada en la parte superior
     lbl_hora_main = lv_label_create(scr_main, nullptr);
-    lv_obj_set_style_text_font(lbl_hora_main, LV_PART_MAIN, LV_STATE_DEFAULT, &lv_font_montserrat_48);
+    lv_obj_set_style_text_font(lbl_hora_main, LV_PART_MAIN, LV_STATE_DEFAULT, &mulish_64_numbers);
     lv_obj_set_style_text_align(lbl_hora_main, LV_PART_MAIN, LV_STATE_DEFAULT, LV_TEXT_ALIGN_CENTER);
     lbl_fecha_main = lv_label_create(scr_main, nullptr);
-    lv_obj_set_style_text_font(lbl_fecha_main, LV_PART_MAIN, LV_STATE_DEFAULT, &lv_font_montserrat_24);
-    lv_obj_set_style_text_color(lbl_estado_main, LV_PART_MAIN, LV_STATE_DEFAULT, lv_color_get_palette_main(LV_COLOR_PALETTE_GREY));
+    lv_obj_set_style_text_font(lbl_fecha_main, LV_PART_MAIN, LV_STATE_DEFAULT, &mulish_24);
+    lv_obj_set_style_text_color(lbl_fecha_main, LV_PART_MAIN, LV_STATE_DEFAULT, lv_color_get_palette_main(LV_COLOR_PALETTE_GREY));
     lv_obj_set_style_text_align(lbl_fecha_main, LV_PART_MAIN, LV_STATE_DEFAULT, LV_TEXT_ALIGN_CENTER);
     set_hora_main("");
     set_fecha_main("");
 
     // Etiqueta de estado centrada en pantalla
     lbl_estado_main = lv_label_create(scr_main, nullptr);
-    lv_obj_set_style_text_font(lbl_estado_main, LV_PART_MAIN, LV_STATE_DEFAULT, &lv_font_montserrat_24);
+    lv_obj_set_style_text_font(lbl_estado_main, LV_PART_MAIN, LV_STATE_DEFAULT, &mulish_32);
     lv_obj_set_style_text_color(lbl_estado_main, LV_PART_MAIN, LV_STATE_DEFAULT, lv_color_get_palette_main(LV_COLOR_PALETTE_BLUE_GREY));
     lv_obj_set_style_text_align(lbl_estado_main, LV_PART_MAIN, LV_STATE_DEFAULT, LV_TEXT_ALIGN_CENTER);
     set_estado_main("");
