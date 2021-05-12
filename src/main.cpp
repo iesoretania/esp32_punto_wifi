@@ -25,7 +25,7 @@ void espi_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *col
 
 // Pantallas
 static lv_obj_t *scrSplash;     // Pantalla de inicio (splash screen)
-static lv_obj_t *scrMain;     // Pantalla principal de lectura de código
+static lv_obj_t *scrMain;       // Pantalla principal de lectura de código
 static lv_obj_t *scrConfig;     // Pantalla de configuración
 
 void setup() {
@@ -67,10 +67,12 @@ void setup() {
 
     // CREAR PANTALLA DE ARRANQUE (splash screen)
     scrSplash = lv_obj_create(nullptr, nullptr);
+    static lv_style_t styleFondoBlanco;
+    lv_obj_set_style_bg_color(scrSplash, 0, LV_STATE_DEFAULT, LV_COLOR_MAKE(255, 255, 255));
 
-    LV_IMG_DECLARE(logo_junta2);
+    LV_IMG_DECLARE(logo_ced);
     lv_obj_t * img = lv_img_create(scrSplash, nullptr);
-    lv_img_set_src(img, &logo_junta2);
+    lv_img_set_src(img, &logo_ced);
     lv_obj_align(img, nullptr, LV_ALIGN_CENTER, 0, 0);
 
     lv_scr_load(scrSplash);
