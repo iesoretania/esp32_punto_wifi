@@ -37,11 +37,18 @@ static lv_obj_t * lbl_ip_splash;
 static lv_obj_t * lbl_estado_splash;
 
 static lv_obj_t * scr_main;       // Pantalla principal de lectura de código
+static lv_obj_t * lbl_hora_main;
+static lv_obj_t * lbl_fecha_main;
+
 static lv_obj_t * scr_config;     // Pantalla de configuración
 
 void create_scr_splash();
 
+void create_scr_main();
+
 void initialize_gui();
+
+void task_main(lv_timer_t *);
 
 void set_estado_splash_format(const char * string, const char * p) {
     lv_label_set_text_fmt(lbl_estado_splash, string, p);
@@ -63,8 +70,28 @@ void set_ip_splash(const char * string) {
     lv_obj_align(lbl_ip_splash, nullptr, LV_ALIGN_IN_BOTTOM_MID, 0, -15);
 }
 
+void set_hora_main_format(const char * string, const char * p) {
+    lv_label_set_text_fmt(lbl_hora_main, string, p);
+    lv_obj_align(lbl_hora_main, nullptr, LV_ALIGN_IN_TOP_MID, 0, 15);
+}
+
+void set_hora_main(const char * string) {
+    lv_label_set_text(lbl_hora_main, string);
+    lv_obj_align(lbl_hora_main, nullptr, LV_ALIGN_IN_TOP_MID, 0, 15);
+}
+
+void set_fecha_main_format(const char * string, const char * p) {
+    lv_label_set_text_fmt(lbl_fecha_main, string, p);
+    lv_obj_align(lbl_fecha_main, lbl_hora_main, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
+}
+
+void set_fecha_main(const char * string) {
+    lv_label_set_text(lbl_fecha_main, string);
+    lv_obj_align(lbl_fecha_main, lbl_hora_main, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
+}
+
 void task_wifi_connection(lv_timer_t * timer) {
-    static enum { CONNECTING, NTP, CHECKING, CHECK_RETRY, WAITING, DONE } state = CONNECTING;
+    static enum { CONNECTING, NTP, CHECKING, CHECK_WAIT, CHECK_RETRY, WAITING, DONE } state = CONNECTING;
     static int cuenta = 0;
     static HTTPClient client;
     int code;
@@ -89,13 +116,15 @@ void task_wifi_connection(lv_timer_t * timer) {
             break;
         case NTP:
             if (sntp_get_sync_status() == SNTP_SYNC_STATUS_COMPLETED) {
-                state = DONE;
+                state = CHECKING;
+                cuenta = 0;
             }
-            state = CHECKING;
-            cuenta = 0;
             break;
         case CHECKING:
             set_estado_splash("Comprobando acceso a Séneca...");
+            state = CHECK_WAIT;
+            break;
+        case CHECK_WAIT:
             client.begin(PUNTO_CONTROL_URL);
             client.setReuse(false);
             code = client.GET();
@@ -111,7 +140,7 @@ void task_wifi_connection(lv_timer_t * timer) {
             break;
         case CHECK_RETRY:
             cuenta++;
-            if (cuenta == 20) {
+            if (cuenta == 10) {
                 state = CHECKING;
             }
             break;
@@ -119,7 +148,46 @@ void task_wifi_connection(lv_timer_t * timer) {
             cuenta++;
             if (cuenta == 20) {
                 state = DONE;
+                lv_scr_load(scr_main);
+                lv_timer_create(task_main, 100, nullptr);
             }
+    }
+}
+
+void task_main(lv_timer_t * timer) {
+    static enum { IDLE, DONE, NO_NETWORK } state = IDLE;
+    static int cuenta = 0;
+    static HTTPClient client;
+    int code;
+
+    time_t now;
+    char strftime_buf[64];
+    struct tm timeinfo;
+
+    switch (state) {
+        case DONE:
+            lv_timer_del(timer);
+            return;
+        case IDLE:
+            if (WiFi.status() != WL_CONNECTED) {
+                state = NO_NETWORK;
+            } else {
+                time(&now);
+
+                localtime_r(&now, &timeinfo);
+                strftime(strftime_buf, sizeof(strftime_buf), "%T", &timeinfo);
+                set_hora_main(strftime_buf);
+
+                strftime(strftime_buf, sizeof(strftime_buf), "%d/%m/%G", &timeinfo);
+                set_fecha_main(strftime_buf);
+            }
+            break;
+        case NO_NETWORK:
+            set_hora_main("NO HAY RED");
+            if (WiFi.status() == WL_CONNECTED) {
+                state = IDLE;
+            }
+            break;
     }
 }
 
@@ -146,6 +214,7 @@ void setup() {
 
     // Crear pantalla de arranque y cambiar a ella
     create_scr_splash();
+    create_scr_main();
     lv_scr_load(scr_splash);
 
     // Inicializar WiFi
@@ -211,6 +280,28 @@ void create_scr_splash() {
     lv_obj_set_style_text_align(lbl_version, LV_PART_MAIN, LV_STATE_DEFAULT, LV_TEXT_ALIGN_LEFT);
     lv_label_set_text(lbl_version, PUNTO_CONTROL_VERSION);
     lv_obj_align(lbl_version, nullptr, LV_ALIGN_IN_BOTTOM_LEFT, 10, -10);
+}
+
+
+void create_scr_main() {
+    // CREAR PANTALLA PRINCIPAL
+    scr_main = lv_obj_create(nullptr, nullptr);
+    lv_obj_set_style_bg_color(scr_main, 0, LV_STATE_DEFAULT, LV_COLOR_MAKE(255, 255, 255));
+
+    // Spinner para indicar operación en progreso en la esquina inferior derecha
+    lv_obj_t * spinner = lv_spinner_create(scr_splash, 1000, 45);
+    lv_obj_set_size(spinner, 50, 50);
+    lv_obj_align(spinner, nullptr, LV_ALIGN_IN_BOTTOM_RIGHT, -10, -10);
+
+    // Etiqueta de hora y fecha actual centrada en la parte superior
+    lbl_hora_main = lv_label_create(scr_main, nullptr);
+    lv_obj_set_style_text_font(lbl_hora_main, LV_PART_MAIN, LV_STATE_DEFAULT, &lv_font_montserrat_48);
+    lv_obj_set_style_text_align(lbl_hora_main, LV_PART_MAIN, LV_STATE_DEFAULT, LV_TEXT_ALIGN_CENTER);
+    lbl_fecha_main = lv_label_create(scr_main, nullptr);
+    lv_obj_set_style_text_font(lbl_fecha_main, LV_PART_MAIN, LV_STATE_DEFAULT, &lv_font_montserrat_24);
+    lv_obj_set_style_text_align(lbl_fecha_main, LV_PART_MAIN, LV_STATE_DEFAULT, LV_TEXT_ALIGN_CENTER);
+    set_hora_main("");
+    set_fecha_main("");
 }
 
 void loop() {
