@@ -3,9 +3,13 @@
 #include <lvgl.h>
 #include <SPI.h>
 #include <TFT_eSPI.h>
+#include <WiFi.h>
 
 #define SCREEN_WIDTH 480
 #define SCREEN_HEIGHT 320
+
+const char* ssid = "\x41\x6E\x64\x61\x72\x65\x64";
+const char* password =  "6b629f4c299371737494c61b5a101693a2d4e9e1f3e1320f3ebf9ae379cecf32";
 
 TFT_eSPI tft = TFT_eSPI();
 
@@ -34,6 +38,31 @@ void create_scr_splash();
 
 void initialize_gui();
 
+void set_estado_splash_format(const char * string, const char * p) {
+    lv_label_set_text_fmt(lbl_estado_splash, string, p);
+    lv_obj_align(lbl_estado_splash, nullptr, LV_ALIGN_IN_TOP_MID, 0, 15);
+}
+
+void set_estado_splash(const char * string) {
+    lv_label_set_text(lbl_estado_splash, string);
+    lv_obj_align(lbl_estado_splash, nullptr, LV_ALIGN_IN_TOP_MID, 0, 15);
+}
+
+void task_wifi_connection(lv_timer_t * timer) {
+    static int cuenta = 0;
+    static int connecting = true;
+
+    if (!connecting) return;
+
+    if (WiFi.status() == WL_CONNECTED) {
+        connecting = false;
+        set_estado_splash_format("Conectado: IP = %s", WiFi.localIP().toString().c_str());
+        lv_timer_del(timer);
+    } else {
+        cuenta++;
+    }
+}
+
 void setup() {
 
     // INICIALIZAR SUBSISTEMAS
@@ -58,7 +87,14 @@ void setup() {
     // Crear pantalla de arranque y cambiar a ella
     create_scr_splash();
     lv_scr_load(scr_splash);
+
+    // Inicializar WiFi
+    set_estado_splash_format("Conectando a %s...", ssid);
+    WiFi.begin(ssid, password);
+
+    lv_timer_create(task_wifi_connection, 100, nullptr);
 }
+
 
 void initialize_gui() {
     lv_init();
@@ -84,7 +120,6 @@ void initialize_gui() {
 void create_scr_splash() {
     // CREAR PANTALLA DE ARRANQUE (splash screen)
     scr_splash = lv_obj_create(nullptr, nullptr);
-    static lv_style_t styleFondoBlanco;
     lv_obj_set_style_bg_color(scr_splash, 0, LV_STATE_DEFAULT, LV_COLOR_MAKE(255, 255, 255));
 
     // Logo de la CED centrado
@@ -100,10 +135,9 @@ void create_scr_splash() {
 
     // Etiqueta de estado actual centrada en la parte superior
     lbl_estado_splash = lv_label_create(scr_splash, nullptr);
-    lv_label_set_text(lbl_estado_splash, "Inicializando...");
-    lv_obj_set_style_text_align(lbl_estado_splash, LV_PART_MAIN, LV_STATE_DEFAULT, LV_TEXT_ALIGN_CENTER);
     lv_obj_set_style_text_font(lbl_estado_splash, LV_PART_MAIN, LV_STATE_DEFAULT, &lv_font_montserrat_24);
-    lv_obj_align(lbl_estado_splash, nullptr, LV_ALIGN_IN_TOP_MID, 0, 15);
+    lv_obj_set_style_text_align(lbl_estado_splash, LV_PART_MAIN, LV_STATE_DEFAULT, LV_TEXT_ALIGN_CENTER);
+    set_estado_splash("Inicializando...");
 }
 
 void loop() {
