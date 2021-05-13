@@ -8,6 +8,7 @@
 #include <WiFi.h>
 #include <lwip/apps/sntp.h>
 #include <HTTPClient.h>
+#include <MFRC522.h>
 
 #define SCREEN_WIDTH 480
 #define SCREEN_HEIGHT 320
@@ -16,6 +17,7 @@ const char* ssid = "\x41\x6E\x64\x61\x72\x65\x64";
 const char* password =  "6b629f4c299371737494c61b5a101693a2d4e9e1f3e1320f3ebf9ae379cecf32";
 
 TFT_eSPI tft = TFT_eSPI();
+MFRC522 mfrc522(RFID_SDA_PIN, RFID_RST_PIN);
 
 /* Flushing en el display */
 void espi_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p)
@@ -170,6 +172,7 @@ void task_wifi_connection(lv_timer_t * timer) {
             if (cuenta == 20) {
                 state = DONE;
                 lv_scr_load(scr_main);
+                lv_obj_clean(scr_splash);
                 lv_timer_create(task_main, 100, nullptr);
             }
     }
@@ -177,10 +180,9 @@ void task_wifi_connection(lv_timer_t * timer) {
 
 void task_main(lv_timer_t * timer) {
     const char *dia_semana[] = { "Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado" };
-    static enum { IDLE, DONE, NO_NETWORK } state = IDLE;
+    static enum { DONE, IDLE, CARD_PRESENT, NO_NETWORK } state = IDLE;
     static int cuenta = 0;
     static HTTPClient client;
-    int code;
 
     time_t now;
     char strftime_buf[64];
@@ -193,9 +195,15 @@ void task_main(lv_timer_t * timer) {
             return;
         case IDLE:
             cuenta++;
+
             if (WiFi.status() != WL_CONNECTED) {
                 state = NO_NETWORK;
             } else {
+                if (mfrc522.PICC_IsNewCardPresent()) {
+                    state = CARD_PRESENT;
+                    break;
+                }
+
                 time(&now);
 
                 localtime_r(&now, &timeinfo);
@@ -219,6 +227,23 @@ void task_main(lv_timer_t * timer) {
                         set_estado_main("CODIGO QR AQUI");
                 }
             }
+            break;
+        case CARD_PRESENT:
+            if (mfrc522.PICC_ReadCardSerial()) {
+                uint32_t uid = (uint32_t) (
+                        mfrc522.uid.uidByte[0] +
+                        (mfrc522.uid.uidByte[1] << 8) +
+                        (mfrc522.uid.uidByte[2] << 16) +
+                        (mfrc522.uid.uidByte[3] << 24));
+
+                String uidS = (String) uid;
+
+                while (uidS.length() < 10) {
+                    uidS = "0" + uidS;
+                }
+            }
+            mfrc522.PICC_HaltA();
+            state = IDLE;
             break;
         case NO_NETWORK:
             set_hora_main("NO HAY RED");
@@ -246,6 +271,9 @@ void setup() {
     SPI.begin();
     tft.begin();            /* Inicializar TFT */
     tft.setRotation(3);     /* Orientación horizontal */
+
+    // Inicializar lector
+    mfrc522.PCD_Init();
 
     // Inicializar GUI
     initialize_gui();
