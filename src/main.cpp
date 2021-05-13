@@ -102,10 +102,11 @@ void set_estado_main(const char * string) {
 }
 
 void task_wifi_connection(lv_timer_t * timer) {
-    static enum { CONNECTING, NTP, CHECKING, CHECK_WAIT, CHECK_RETRY, WAITING, DONE } state = CONNECTING;
+    static enum { CONNECTING, NTP_START, NTP_WAIT, CHECKING, CHECK_WAIT, CHECK_RETRY, WAITING, DONE } state = CONNECTING;
     static int cuenta = 0;
     static HTTPClient client;
-    int code;
+    static int code;
+    IPAddress ip;
 
     switch (state) {
         case DONE:
@@ -113,19 +114,28 @@ void task_wifi_connection(lv_timer_t * timer) {
             return;
         case CONNECTING:
             if (WiFi.status() == WL_CONNECTED) {
-                state = NTP;
+                state = NTP_START;
                 set_ip_splash_format("IP: %s", WiFi.localIP().toString().c_str());
-                set_estado_splash("Ajustando hora...");
-                setenv("TZ", PUNTO_CONTROL_HUSO_HORARIO, 1);
-                tzset();
-                sntp_setoperatingmode(SNTP_OPMODE_POLL);
-                sntp_setservername(0, "pool.ntp.org");
-                sntp_init();
+                set_estado_splash("Comprobando conectividad Andared...");
+                code = WiFi.hostByName("c0", ip);
             } else {
                 cuenta++;
             }
             break;
-        case NTP:
+        case NTP_START:
+            set_estado_splash("Ajustando hora...");
+            setenv("TZ", PUNTO_CONTROL_HUSO_HORARIO, 1);
+            tzset();
+            sntp_setoperatingmode(SNTP_OPMODE_POLL);
+            if (code != 1) {
+                sntp_setservername(0, (char *) PUNTO_CONTROL_NTP_SERVER);
+            } else {
+                sntp_setservername(0, (char *) "c0");
+            }
+            sntp_init();
+            state = NTP_WAIT;
+            break;
+        case NTP_WAIT:
             if (sntp_get_sync_status() == SNTP_SYNC_STATUS_COMPLETED) {
                 state = CHECKING;
                 cuenta = 0;
@@ -166,7 +176,7 @@ void task_wifi_connection(lv_timer_t * timer) {
 }
 
 void task_main(lv_timer_t * timer) {
-    char *dia_semana[] = { "Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado" };
+    const char *dia_semana[] = { "Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado" };
     static enum { IDLE, DONE, NO_NETWORK } state = IDLE;
     static int cuenta = 0;
     static HTTPClient client;
