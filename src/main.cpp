@@ -51,10 +51,11 @@ static lv_obj_t * scr_main;       // Pantalla principal de lectura de código
 static lv_obj_t * lbl_hora_main;
 static lv_obj_t * lbl_fecha_main;
 static lv_obj_t * lbl_estado_main;
-static lv_obj_t * img_main;
+static lv_obj_t * lbl_icon_main;
 
 static lv_obj_t * scr_check;      // Pantalla de comprobación
 static lv_obj_t * lbl_estado_check;
+static lv_obj_t * lbl_icon_check;
 
 static lv_obj_t * scr_config;     // Pantalla de configuración
 
@@ -67,6 +68,8 @@ void initialize_gui();
 void task_main(lv_timer_t *);
 
 void initialize_flash();
+
+void set_icon_text(lv_obj_t *pObj, const char *string, lv_color_palette_t param, int bottom);
 
 void set_estado_splash_format(const char * string, const char * p) {
     lv_label_set_text_fmt(lbl_estado_splash, string, p);
@@ -120,12 +123,12 @@ void set_estado_main(const char * string) {
 
 void set_estado_check_format(const char * string, const char * p) {
     lv_label_set_text_fmt(lbl_estado_check, string, p);
-    lv_obj_align(lbl_estado_check, nullptr, LV_ALIGN_IN_TOP_MID, 0, 15);
+    lv_obj_align(lbl_estado_check, lbl_icon_check, LV_ALIGN_OUT_BOTTOM_MID, 0, 25);
 }
 
 void set_estado_check(const char * string) {
     lv_label_set_text(lbl_estado_check, string);
-    lv_obj_align(lbl_estado_check, nullptr, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_align(lbl_estado_check, lbl_icon_check, LV_ALIGN_OUT_BOTTOM_MID, 0, 25);
 }
 
 void task_wifi_connection(lv_timer_t * timer) {
@@ -262,14 +265,23 @@ int send_seneca_request(String url, String body, String cookie) {
                 response = iso_8859_1_to_utf8(response);
 
                 // mostrar respuesta en pantalla
+                if (response.startsWith("Entrada")) {
+                    set_icon_text(lbl_icon_check, "\uF2F6", LV_COLOR_PALETTE_GREEN, 0);
+                } else if (response.startsWith("Salida")) {
+                    set_icon_text(lbl_icon_check, "\uF2F5", LV_COLOR_PALETTE_RED, 0);
+                } else {
+                    set_icon_text(lbl_icon_check, "\uF071", LV_COLOR_PALETTE_ORANGE, 0);
+                }
                 set_estado_check(response.c_str());
 
                 ok = 1; // éxito
             }
         } else {
+            set_icon_text(lbl_icon_check, "\uF071", LV_COLOR_PALETTE_ORANGE, 0);
             set_estado_check("Se ha obtenido una respuesta desconocida desde Séneca.");
         }
     } else {
+        set_icon_text(lbl_icon_check, "\uF071", LV_COLOR_PALETTE_ORANGE, 0);
         set_estado_check("Ha ocurrido un error en la comunicación con Séneca.");
     }
 
@@ -396,6 +408,8 @@ void task_main(lv_timer_t * timer) {
                         while (uidS.length() < 10) {
                             uidS = "0" + uidS;
                         }
+
+                        set_icon_text(lbl_icon_check, "\uF252", LV_COLOR_PALETTE_TEAL, 0);
                         set_estado_check("Llavero detectado. Comunicando con Séneca, espere por favor...");
                         lv_scr_load(scr_check);
                         state = CARD_PRESENT;
@@ -425,7 +439,7 @@ void task_main(lv_timer_t * timer) {
                         set_estado_main("Pulse pantalla para PIN");
                         break;
                     case 2:
-                        set_estado_main("CODIGO QR AQUI");
+                        set_estado_main("CÓDIGO QR IRÁ AQUÍ");
                 }
             }
             break;
@@ -578,11 +592,10 @@ void create_scr_main() {
     lv_obj_set_style_text_align(lbl_estado_main, LV_PART_MAIN, LV_STATE_DEFAULT, LV_TEXT_ALIGN_CENTER);
     set_estado_main("");
 
-    // Imagen del llavero centrado
-    LV_IMG_DECLARE(llavero);
-    img_main = lv_img_create(scr_main, nullptr);
-    lv_img_set_src(img_main, &llavero);
-    lv_obj_align(img_main, nullptr, LV_ALIGN_IN_BOTTOM_MID, 0, -15);
+    // Imagen de la flecha en la parte inferior
+    lbl_icon_main = lv_label_create(scr_main, nullptr);
+    lv_obj_set_style_text_font(lbl_icon_main, LV_PART_MAIN, LV_STATE_DEFAULT, &symbols);
+    set_icon_text(lbl_icon_main, "\uF063", LV_COLOR_PALETTE_BLUE, 1);
 }
 
 void create_scr_check() {
@@ -590,7 +603,12 @@ void create_scr_check() {
     scr_check = lv_obj_create(nullptr, nullptr);
     lv_obj_set_style_bg_color(scr_check, 0, LV_STATE_DEFAULT, LV_COLOR_MAKE(255, 255, 255));
 
-    // Etiqueta de hora y fecha actual centrada en la parte superior
+    // Icono del estado de comprobación
+    lbl_icon_check = lv_label_create(scr_check, nullptr);
+    lv_obj_set_style_text_font(lbl_icon_check, LV_PART_MAIN, LV_STATE_DEFAULT, &symbols);
+    set_icon_text(lbl_icon_check, "\uF252", LV_COLOR_PALETTE_BLUE, 0);
+
+    // Etiqueta de estado de comprobación
     lbl_estado_check = lv_label_create(scr_check, nullptr);
     lv_obj_set_style_text_font(lbl_estado_check, LV_PART_MAIN, LV_STATE_DEFAULT, &mulish_32);
     lv_obj_set_style_text_color(lbl_estado_check, LV_PART_MAIN, LV_STATE_DEFAULT, lv_color_get_palette_main(LV_COLOR_PALETTE_BLUE_GREY));
@@ -598,12 +616,13 @@ void create_scr_check() {
     lv_label_set_long_mode(lbl_estado_check, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(lbl_estado_check, SCREEN_WIDTH * 9 / 10);
     set_estado_check("");
+}
 
-    // Imagen del llavero centrado
-    LV_IMG_DECLARE(llavero);
-    img_main = lv_img_create(scr_main, nullptr);
-    lv_img_set_src(img_main, &llavero);
-    lv_obj_align(img_main, nullptr, LV_ALIGN_IN_BOTTOM_MID, 0, -15);
+void set_icon_text(lv_obj_t * label, const char * text, lv_color_palette_t color, int bottom) {
+    lv_obj_set_style_text_color(label, LV_PART_MAIN, LV_STATE_DEFAULT, lv_color_get_palette_main(color));
+    lv_label_set_text(label, text);
+    lv_obj_set_style_text_align(label, LV_PART_MAIN, LV_STATE_DEFAULT, LV_TEXT_ALIGN_CENTER);
+    lv_obj_align(label, nullptr, bottom ? LV_ALIGN_IN_BOTTOM_MID : LV_ALIGN_IN_TOP_MID, 0, bottom ? -15 : 15);
 }
 
 void loop() {

@@ -305,7 +305,8 @@ typedef void * lv_user_data_t;
                                LV_FONT_DECLARE(mulish_16) \
                                LV_FONT_DECLARE(mulish_24) \
                                LV_FONT_DECLARE(mulish_32) \
-                               LV_FONT_DECLARE(mulish_64_numbers)
+                               LV_FONT_DECLARE(mulish_64_numbers) \
+                               LV_FONT_DECLARE(symbols)
 
 /*Always set a default font*/
 #define LV_FONT_DEFAULT &mulish_16
