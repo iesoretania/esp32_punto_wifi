@@ -93,12 +93,12 @@ void set_fecha_main(const char * string) {
 
 void set_estado_main_format(const char * string, const char * p) {
     lv_label_set_text_fmt(lbl_estado_main, string, p);
-    lv_obj_align(lbl_estado_main, nullptr, LV_ALIGN_CENTER, 0, 10);
+    lv_obj_align(lbl_estado_main, lbl_fecha_main, LV_ALIGN_OUT_BOTTOM_MID, 0, 20);
 }
 
 void set_estado_main(const char * string) {
     lv_label_set_text(lbl_estado_main, string);
-    lv_obj_align(lbl_estado_main, nullptr, LV_ALIGN_CENTER, 0, 10);
+    lv_obj_align(lbl_estado_main, lbl_fecha_main, LV_ALIGN_OUT_BOTTOM_MID, 0, 20);
 }
 
 void task_wifi_connection(lv_timer_t * timer) {
@@ -343,6 +343,12 @@ void create_scr_main() {
     lv_obj_set_style_text_color(lbl_estado_main, LV_PART_MAIN, LV_STATE_DEFAULT, lv_color_get_palette_main(LV_COLOR_PALETTE_BLUE_GREY));
     lv_obj_set_style_text_align(lbl_estado_main, LV_PART_MAIN, LV_STATE_DEFAULT, LV_TEXT_ALIGN_CENTER);
     set_estado_main("");
+
+    // Imagen del llavero centrado
+    LV_IMG_DECLARE(llavero);
+    lv_obj_t * img = lv_img_create(scr_main, nullptr);
+    lv_img_set_src(img, &llavero);
+    lv_obj_align(img, nullptr, LV_ALIGN_IN_BOTTOM_MID, 0, -15);
 }
 
 void loop() {
