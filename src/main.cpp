@@ -43,24 +43,26 @@ void espi_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *col
 }
 
 // Pantallas
-static lv_obj_t * scr_splash;     // Pantalla de inicio (splash screen)
-static lv_obj_t * lbl_ip_splash;
-static lv_obj_t * lbl_estado_splash;
+static lv_obj_t *scr_splash;     // Pantalla de inicio (splash screen)
+static lv_obj_t *lbl_ip_splash;
+static lv_obj_t *lbl_estado_splash;
 
-static lv_obj_t * scr_main;       // Pantalla principal de lectura de código
-static lv_obj_t * lbl_hora_main;
-static lv_obj_t * lbl_fecha_main;
-static lv_obj_t * lbl_estado_main;
-static lv_obj_t * lbl_icon_main;
+static lv_obj_t *scr_main;       // Pantalla principal de lectura de código
+static lv_obj_t *lbl_hora_main;
+static lv_obj_t *lbl_fecha_main;
+static lv_obj_t *lbl_estado_main;
+static lv_obj_t *lbl_icon_main;
 
-static lv_obj_t * scr_check;      // Pantalla de comprobación
-static lv_obj_t * lbl_estado_check;
-static lv_obj_t * lbl_icon_check;
+static lv_obj_t *scr_check;      // Pantalla de comprobación
+static lv_obj_t *lbl_estado_check;
+static lv_obj_t *lbl_icon_check;
 
-static lv_obj_t * scr_config;     // Pantalla de configuración
+static lv_obj_t *scr_config;     // Pantalla de configuración
 
 void create_scr_splash();
+
 void create_scr_main();
+
 void create_scr_check();
 
 void initialize_gui();
@@ -71,68 +73,70 @@ void initialize_flash();
 
 void set_icon_text(lv_obj_t *pObj, const char *string, lv_color_palette_t param, int bottom);
 
-void set_estado_splash_format(const char * string, const char * p) {
+void set_estado_splash_format(const char *string, const char *p) {
     lv_label_set_text_fmt(lbl_estado_splash, string, p);
     lv_obj_align(lbl_estado_splash, nullptr, LV_ALIGN_IN_TOP_MID, 0, 15);
 }
 
-void set_estado_splash(const char * string) {
+void set_estado_splash(const char *string) {
     lv_label_set_text(lbl_estado_splash, string);
     lv_obj_align(lbl_estado_splash, nullptr, LV_ALIGN_IN_TOP_MID, 0, 15);
 }
 
-void set_ip_splash_format(const char * string, const char * p) {
+void set_ip_splash_format(const char *string, const char *p) {
     lv_label_set_text_fmt(lbl_ip_splash, string, p);
     lv_obj_align(lbl_ip_splash, nullptr, LV_ALIGN_IN_BOTTOM_MID, 0, -15);
 }
 
-void set_ip_splash(const char * string) {
+void set_ip_splash(const char *string) {
     lv_label_set_text(lbl_ip_splash, string);
     lv_obj_align(lbl_ip_splash, nullptr, LV_ALIGN_IN_BOTTOM_MID, 0, -15);
 }
 
-void set_hora_main_format(const char * string, const char * p) {
+void set_hora_main_format(const char *string, const char *p) {
     lv_label_set_text_fmt(lbl_hora_main, string, p);
     lv_obj_align(lbl_hora_main, nullptr, LV_ALIGN_IN_TOP_MID, 0, 15);
 }
 
-void set_hora_main(const char * string) {
+void set_hora_main(const char *string) {
     lv_label_set_text(lbl_hora_main, string);
     lv_obj_align(lbl_hora_main, nullptr, LV_ALIGN_IN_TOP_MID, 0, 15);
 }
 
-void set_fecha_main_format(const char * string, const char * p) {
+void set_fecha_main_format(const char *string, const char *p) {
     lv_label_set_text_fmt(lbl_fecha_main, string, p);
     lv_obj_align(lbl_fecha_main, lbl_hora_main, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
 }
 
-void set_fecha_main(const char * string) {
+void set_fecha_main(const char *string) {
     lv_label_set_text(lbl_fecha_main, string);
     lv_obj_align(lbl_fecha_main, lbl_hora_main, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
 }
 
-void set_estado_main_format(const char * string, const char * p) {
+void set_estado_main_format(const char *string, const char *p) {
     lv_label_set_text_fmt(lbl_estado_main, string, p);
     lv_obj_align(lbl_estado_main, lbl_fecha_main, LV_ALIGN_OUT_BOTTOM_MID, 0, 20);
 }
 
-void set_estado_main(const char * string) {
+void set_estado_main(const char *string) {
     lv_label_set_text(lbl_estado_main, string);
     lv_obj_align(lbl_estado_main, lbl_fecha_main, LV_ALIGN_OUT_BOTTOM_MID, 0, 20);
 }
 
-void set_estado_check_format(const char * string, const char * p) {
+void set_estado_check_format(const char *string, const char *p) {
     lv_label_set_text_fmt(lbl_estado_check, string, p);
     lv_obj_align(lbl_estado_check, lbl_icon_check, LV_ALIGN_OUT_BOTTOM_MID, 0, 25);
 }
 
-void set_estado_check(const char * string) {
+void set_estado_check(const char *string) {
     lv_label_set_text(lbl_estado_check, string);
     lv_obj_align(lbl_estado_check, lbl_icon_check, LV_ALIGN_OUT_BOTTOM_MID, 0, 25);
 }
 
-void task_wifi_connection(lv_timer_t * timer) {
-    static enum { CONNECTING, NTP_START, NTP_WAIT, CHECKING, CHECK_WAIT, CHECK_RETRY, WAITING, DONE } state = CONNECTING;
+void task_wifi_connection(lv_timer_t *timer) {
+    static enum {
+        CONNECTING, NTP_START, NTP_WAIT, CHECKING, CHECK_WAIT, CHECK_RETRY, WAITING, DONE
+    } state = CONNECTING;
     static int cuenta = 0;
     static HTTPClient client;
     static int code;
@@ -208,18 +212,15 @@ void task_wifi_connection(lv_timer_t * timer) {
 
 String response;
 
-String iso_8859_1_to_utf8(String &str)
-{
+String iso_8859_1_to_utf8(String &str) {
     String strOut;
-    for (int i = 0; i < str.length(); i++)
-    {
+    for (int i = 0; i < str.length(); i++) {
         uint8_t ch = str.charAt(i);
         if (ch < 0x80) {
             strOut.concat((char) ch);
-        }
-        else {
-            strOut.concat((char)(0xc0 | ch >> 6));
-            strOut.concat((char)(0x80 | (ch & 0x3f)));
+        } else {
+            strOut.concat((char) (0xc0 | ch >> 6));
+            strOut.concat((char) (0x80 | (ch & 0x3f)));
         }
     }
     return strOut;
@@ -250,13 +251,11 @@ int send_seneca_request(String url, String body, String cookie) {
             index2 = response.indexOf("</strong>");
             if (index2 > index) {
                 response = response.substring(index + 8, index2);
-                while (response.indexOf("<") >= 0)
-                {
+                while (response.indexOf("<") >= 0) {
                     auto startpos = response.indexOf("<");
                     auto endpos = response.indexOf(">") + 1;
 
-                    if (endpos > startpos)
-                    {
+                    if (endpos > startpos) {
                         response = response.substring(0, startpos) + response.substring(endpos);
                     }
                 }
@@ -296,7 +295,7 @@ String modo, punto, xCentro, cookie;
 int xmlStatus;
 String xml_current_input;
 
-void xml_cookie_callback(uint8_t statusflags, char* tagName, uint16_t tagNameLen, char* data, uint16_t dataLen) {
+void xml_cookie_callback(uint8_t statusflags, char *tagName, uint16_t tagNameLen, char *data, uint16_t dataLen) {
     // nos quedamos con las etiquetas <input>
     if ((statusflags & STATUS_START_TAG) && strstr(tagName, "input")) {
         xmlStatus = 1;
@@ -325,8 +324,8 @@ void xml_cookie_callback(uint8_t statusflags, char* tagName, uint16_t tagNameLen
 
 void process_token(String uid) {
     // obtener cookie de sesión
-    const char * headerKeys[] = {"Set-Cookie"} ;
-    size_t headerKeysSize = sizeof(headerKeys) / sizeof(char*);
+    const char *headerKeys[] = {"Set-Cookie"};
+    size_t headerKeysSize = sizeof(headerKeys) / sizeof(char *);
 
     // obtener página web
     client.begin(PUNTO_CONTROL_URL);
@@ -365,7 +364,9 @@ void process_token(String uid) {
         client.end();
 
         // enviar token a Séneca
-        String params = "_MODO_=" + modo + "&PUNTO=" + punto + "&X_CENTRO=" + xCentro + "&C_TIPACCCONTPRE=&DARK_MODE=N&TOKEN="+uid;
+        String params =
+                "_MODO_=" + modo + "&PUNTO=" + punto + "&X_CENTRO=" + xCentro + "&C_TIPACCCONTPRE=&DARK_MODE=N&TOKEN=" +
+                uid;
 
         send_seneca_request(PUNTO_CONTROL_URL, params, cookie);
     } else {
@@ -373,9 +374,11 @@ void process_token(String uid) {
     }
 }
 
-void task_main(lv_timer_t * timer) {
-    const char *dia_semana[] = { "Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado" };
-    static enum { DONE, IDLE, CARD_PRESENT, CHECK_RESULT_WAIT, NO_NETWORK } state = IDLE;
+void task_main(lv_timer_t *timer) {
+    const char *dia_semana[] = {"Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"};
+    static enum {
+        DONE, IDLE, CARD_PRESENT, CHECK_RESULT_WAIT, NO_NETWORK
+    } state = IDLE;
     static int cuenta = 0;
     static HTTPClient client;
     static String uidS;
@@ -540,12 +543,12 @@ void create_scr_splash() {
 
     // Logo de la CED centrado
     LV_IMG_DECLARE(logo_ced);
-    lv_obj_t * img = lv_img_create(scr_splash, nullptr);
+    lv_obj_t *img = lv_img_create(scr_splash, nullptr);
     lv_img_set_src(img, &logo_ced);
     lv_obj_align(img, nullptr, LV_ALIGN_CENTER, 0, 0);
 
     // Spinner para indicar operación en progreso en la esquina inferior derecha
-    lv_obj_t * spinner = lv_spinner_create(scr_splash, 1000, 45);
+    lv_obj_t *spinner = lv_spinner_create(scr_splash, 1000, 45);
     lv_obj_set_size(spinner, 50, 50);
     lv_obj_align(spinner, nullptr, LV_ALIGN_IN_BOTTOM_RIGHT, -10, -10);
 
@@ -562,7 +565,7 @@ void create_scr_splash() {
     set_ip_splash("Esperando configuración");
 
     // Etiqueta de versión del software en la esquina inferior izquierda
-    lv_obj_t * lbl_version = lv_label_create(scr_splash, nullptr);
+    lv_obj_t *lbl_version = lv_label_create(scr_splash, nullptr);
     lv_obj_set_style_text_font(lbl_version, LV_PART_MAIN, LV_STATE_DEFAULT, &mulish_16);
     lv_obj_set_style_text_align(lbl_version, LV_PART_MAIN, LV_STATE_DEFAULT, LV_TEXT_ALIGN_LEFT);
     lv_label_set_text(lbl_version, PUNTO_CONTROL_VERSION);
@@ -580,7 +583,8 @@ void create_scr_main() {
     lv_obj_set_style_text_align(lbl_hora_main, LV_PART_MAIN, LV_STATE_DEFAULT, LV_TEXT_ALIGN_CENTER);
     lbl_fecha_main = lv_label_create(scr_main, nullptr);
     lv_obj_set_style_text_font(lbl_fecha_main, LV_PART_MAIN, LV_STATE_DEFAULT, &mulish_24);
-    lv_obj_set_style_text_color(lbl_fecha_main, LV_PART_MAIN, LV_STATE_DEFAULT, lv_color_get_palette_main(LV_COLOR_PALETTE_GREY));
+    lv_obj_set_style_text_color(lbl_fecha_main, LV_PART_MAIN, LV_STATE_DEFAULT,
+                                lv_color_get_palette_main(LV_COLOR_PALETTE_GREY));
     lv_obj_set_style_text_align(lbl_fecha_main, LV_PART_MAIN, LV_STATE_DEFAULT, LV_TEXT_ALIGN_CENTER);
     set_hora_main("");
     set_fecha_main("");
@@ -588,7 +592,8 @@ void create_scr_main() {
     // Etiqueta de estado centrada en pantalla
     lbl_estado_main = lv_label_create(scr_main, nullptr);
     lv_obj_set_style_text_font(lbl_estado_main, LV_PART_MAIN, LV_STATE_DEFAULT, &mulish_32);
-    lv_obj_set_style_text_color(lbl_estado_main, LV_PART_MAIN, LV_STATE_DEFAULT, lv_color_get_palette_main(LV_COLOR_PALETTE_BLUE_GREY));
+    lv_obj_set_style_text_color(lbl_estado_main, LV_PART_MAIN, LV_STATE_DEFAULT,
+                                lv_color_get_palette_main(LV_COLOR_PALETTE_BLUE_GREY));
     lv_obj_set_style_text_align(lbl_estado_main, LV_PART_MAIN, LV_STATE_DEFAULT, LV_TEXT_ALIGN_CENTER);
     set_estado_main("");
 
@@ -611,14 +616,15 @@ void create_scr_check() {
     // Etiqueta de estado de comprobación
     lbl_estado_check = lv_label_create(scr_check, nullptr);
     lv_obj_set_style_text_font(lbl_estado_check, LV_PART_MAIN, LV_STATE_DEFAULT, &mulish_32);
-    lv_obj_set_style_text_color(lbl_estado_check, LV_PART_MAIN, LV_STATE_DEFAULT, lv_color_get_palette_main(LV_COLOR_PALETTE_BLUE_GREY));
+    lv_obj_set_style_text_color(lbl_estado_check, LV_PART_MAIN, LV_STATE_DEFAULT,
+                                lv_color_get_palette_main(LV_COLOR_PALETTE_BLUE_GREY));
     lv_obj_set_style_text_align(lbl_estado_check, LV_PART_MAIN, LV_STATE_DEFAULT, LV_TEXT_ALIGN_CENTER);
     lv_label_set_long_mode(lbl_estado_check, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(lbl_estado_check, SCREEN_WIDTH * 9 / 10);
     set_estado_check("");
 }
 
-void set_icon_text(lv_obj_t * label, const char * text, lv_color_palette_t color, int bottom) {
+void set_icon_text(lv_obj_t *label, const char *text, lv_color_palette_t color, int bottom) {
     lv_obj_set_style_text_color(label, LV_PART_MAIN, LV_STATE_DEFAULT, lv_color_get_palette_main(color));
     lv_label_set_text(label, text);
     lv_obj_set_style_text_align(label, LV_PART_MAIN, LV_STATE_DEFAULT, LV_TEXT_ALIGN_CENTER);
