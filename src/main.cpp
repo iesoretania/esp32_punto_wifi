@@ -17,7 +17,7 @@
 #define SCREEN_HEIGHT 320
 
 const char* ssid = "\x41\x6E\x64\x61\x72\x65\x64";
-const char* password =  "6b629f4c299371737494c61b5a101693a2d4e9e1f3e1320f3ebf9ae379cecf32";
+const char* psk =  "6b629f4c299371737494c61b5a101693a2d4e9e1f3e1320f3ebf9ae379cecf32";
 
 TFT_eSPI tft = TFT_eSPI();
 MFRC522 mfrc522(RFID_SDA_PIN, RFID_RST_PIN);
@@ -131,6 +131,13 @@ void set_estado_check_format(const char *string, const char *p) {
 void set_estado_check(const char *string) {
     lv_label_set_text(lbl_estado_check, string);
     lv_obj_align(lbl_estado_check, lbl_icon_check, LV_ALIGN_OUT_BOTTOM_MID, 0, 25);
+}
+
+void set_icon_text(lv_obj_t *label, const char *text, lv_color_palette_t color, int bottom) {
+    lv_obj_set_style_text_color(label, LV_PART_MAIN, LV_STATE_DEFAULT, lv_color_get_palette_main(color));
+    lv_label_set_text(label, text);
+    lv_obj_set_style_text_align(label, LV_PART_MAIN, LV_STATE_DEFAULT, LV_TEXT_ALIGN_CENTER);
+    lv_obj_align(label, nullptr, bottom ? LV_ALIGN_IN_BOTTOM_MID : LV_ALIGN_IN_TOP_MID, 0, bottom ? -15 : 15);
 }
 
 void task_wifi_connection(lv_timer_t *timer) {
@@ -501,7 +508,7 @@ void setup() {
 
     // Inicializar WiFi
     set_estado_splash_format("Conectando a %s...", ssid);
-    WiFi.begin(ssid, password);
+    WiFi.begin(ssid, psk);
 
     lv_timer_create(task_wifi_connection, 100, nullptr);
 }
@@ -624,12 +631,6 @@ void create_scr_check() {
     set_estado_check("");
 }
 
-void set_icon_text(lv_obj_t *label, const char *text, lv_color_palette_t color, int bottom) {
-    lv_obj_set_style_text_color(label, LV_PART_MAIN, LV_STATE_DEFAULT, lv_color_get_palette_main(color));
-    lv_label_set_text(label, text);
-    lv_obj_set_style_text_align(label, LV_PART_MAIN, LV_STATE_DEFAULT, LV_TEXT_ALIGN_CENTER);
-    lv_obj_align(label, nullptr, bottom ? LV_ALIGN_IN_BOTTOM_MID : LV_ALIGN_IN_TOP_MID, 0, bottom ? -15 : 15);
-}
 
 void loop() {
     lv_task_handler();
