@@ -71,73 +71,73 @@ void task_main(lv_timer_t *);
 
 void initialize_flash();
 
-void set_icon_text(lv_obj_t *pObj, const char *string, lv_color_palette_t param, int bottom);
+void set_icon_text(lv_obj_t *pObj, const char *string, lv_color_t param, int bottom);
 
 void set_estado_splash_format(const char *string, const char *p) {
     lv_label_set_text_fmt(lbl_estado_splash, string, p);
-    lv_obj_align(lbl_estado_splash, nullptr, LV_ALIGN_IN_TOP_MID, 0, 15);
+    lv_obj_align(lbl_estado_splash, LV_ALIGN_TOP_MID, 0, 15);
 }
 
 void set_estado_splash(const char *string) {
     lv_label_set_text(lbl_estado_splash, string);
-    lv_obj_align(lbl_estado_splash, nullptr, LV_ALIGN_IN_TOP_MID, 0, 15);
+    lv_obj_align(lbl_estado_splash, LV_ALIGN_TOP_MID, 0, 15);
 }
 
 void set_ip_splash_format(const char *string, const char *p) {
     lv_label_set_text_fmt(lbl_ip_splash, string, p);
-    lv_obj_align(lbl_ip_splash, nullptr, LV_ALIGN_IN_BOTTOM_MID, 0, -15);
+    lv_obj_align(lbl_ip_splash, LV_ALIGN_BOTTOM_MID, 0, -15);
 }
 
 void set_ip_splash(const char *string) {
     lv_label_set_text(lbl_ip_splash, string);
-    lv_obj_align(lbl_ip_splash, nullptr, LV_ALIGN_IN_BOTTOM_MID, 0, -15);
+    lv_obj_align(lbl_ip_splash, LV_ALIGN_BOTTOM_MID, 0, -15);
 }
 
 void set_hora_main_format(const char *string, const char *p) {
     lv_label_set_text_fmt(lbl_hora_main, string, p);
-    lv_obj_align(lbl_hora_main, nullptr, LV_ALIGN_IN_TOP_MID, 0, 15);
+    lv_obj_align(lbl_hora_main, LV_ALIGN_TOP_MID, 0, 15);
 }
 
 void set_hora_main(const char *string) {
     lv_label_set_text(lbl_hora_main, string);
-    lv_obj_align(lbl_hora_main, nullptr, LV_ALIGN_IN_TOP_MID, 0, 15);
+    lv_obj_align(lbl_hora_main, LV_ALIGN_TOP_MID, 0, 15);
 }
 
 void set_fecha_main_format(const char *string, const char *p) {
     lv_label_set_text_fmt(lbl_fecha_main, string, p);
-    lv_obj_align(lbl_fecha_main, lbl_hora_main, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
+    lv_obj_align_to(lbl_fecha_main, lbl_hora_main, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
 }
 
 void set_fecha_main(const char *string) {
     lv_label_set_text(lbl_fecha_main, string);
-    lv_obj_align(lbl_fecha_main, lbl_hora_main, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
+    lv_obj_align_to(lbl_fecha_main, lbl_hora_main, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
 }
 
 void set_estado_main_format(const char *string, const char *p) {
     lv_label_set_text_fmt(lbl_estado_main, string, p);
-    lv_obj_align(lbl_estado_main, lbl_fecha_main, LV_ALIGN_OUT_BOTTOM_MID, 0, 20);
+    lv_obj_align_to(lbl_estado_main, lbl_fecha_main, LV_ALIGN_OUT_BOTTOM_MID, 0, 20);
 }
 
 void set_estado_main(const char *string) {
     lv_label_set_text(lbl_estado_main, string);
-    lv_obj_align(lbl_estado_main, lbl_fecha_main, LV_ALIGN_OUT_BOTTOM_MID, 0, 20);
+    lv_obj_align_to(lbl_estado_main, lbl_fecha_main, LV_ALIGN_OUT_BOTTOM_MID, 0, 20);
 }
 
 void set_estado_check_format(const char *string, const char *p) {
     lv_label_set_text_fmt(lbl_estado_check, string, p);
-    lv_obj_align(lbl_estado_check, lbl_icon_check, LV_ALIGN_OUT_BOTTOM_MID, 0, 25);
+    lv_obj_align_to(lbl_estado_check, lbl_icon_check, LV_ALIGN_OUT_BOTTOM_MID, 0, 25);
 }
 
 void set_estado_check(const char *string) {
     lv_label_set_text(lbl_estado_check, string);
-    lv_obj_align(lbl_estado_check, lbl_icon_check, LV_ALIGN_OUT_BOTTOM_MID, 0, 25);
+    lv_obj_align_to(lbl_estado_check, lbl_icon_check, LV_ALIGN_OUT_BOTTOM_MID, 0, 25);
 }
 
-void set_icon_text(lv_obj_t *label, const char *text, lv_color_palette_t color, int bottom) {
-    lv_obj_set_style_text_color(label, LV_PART_MAIN, LV_STATE_DEFAULT, lv_color_get_palette_main(color));
+void set_icon_text(lv_obj_t *label, const char *text, lv_palette_t color, int bottom) {
+    lv_obj_set_style_text_color(label, lv_palette_main(color), LV_PART_MAIN);
     lv_label_set_text(label, text);
-    lv_obj_set_style_text_align(label, LV_PART_MAIN, LV_STATE_DEFAULT, LV_TEXT_ALIGN_CENTER);
-    lv_obj_align(label, nullptr, bottom ? LV_ALIGN_IN_BOTTOM_MID : LV_ALIGN_IN_TOP_MID, 0, bottom ? -15 : 15);
+    lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+    lv_obj_align(label, bottom ? LV_ALIGN_BOTTOM_MID : LV_ALIGN_TOP_MID, 0, bottom ? -15 : 15);
 }
 
 void task_wifi_connection(lv_timer_t *timer) {
@@ -272,22 +272,22 @@ int send_seneca_request(String url, String body, String cookie) {
 
                 // mostrar respuesta en pantalla
                 if (response.startsWith("Entrada")) {
-                    set_icon_text(lbl_icon_check, "\uF2F6", LV_COLOR_PALETTE_GREEN, 0);
+                    set_icon_text(lbl_icon_check, "\uF2F6", LV_PALETTE_GREEN, 0);
                 } else if (response.startsWith("Salida")) {
-                    set_icon_text(lbl_icon_check, "\uF2F5", LV_COLOR_PALETTE_RED, 0);
+                    set_icon_text(lbl_icon_check, "\uF2F5", LV_PALETTE_RED, 0);
                 } else {
-                    set_icon_text(lbl_icon_check, "\uF071", LV_COLOR_PALETTE_ORANGE, 0);
+                    set_icon_text(lbl_icon_check, "\uF071", LV_PALETTE_ORANGE, 0);
                 }
                 set_estado_check(response.c_str());
 
                 ok = 1; // éxito
             }
         } else {
-            set_icon_text(lbl_icon_check, "\uF071", LV_COLOR_PALETTE_ORANGE, 0);
+            set_icon_text(lbl_icon_check, "\uF071", LV_PALETTE_ORANGE, 0);
             set_estado_check("Se ha obtenido una respuesta desconocida desde Séneca.");
         }
     } else {
-        set_icon_text(lbl_icon_check, "\uF071", LV_COLOR_PALETTE_ORANGE, 0);
+        set_icon_text(lbl_icon_check, "\uF071", LV_PALETTE_ORANGE, 0);
         set_estado_check("Ha ocurrido un error en la comunicación con Séneca.");
     }
 
@@ -419,7 +419,7 @@ void task_main(lv_timer_t *timer) {
                             uidS = "0" + uidS;
                         }
 
-                        set_icon_text(lbl_icon_check, "\uF252", LV_COLOR_PALETTE_TEAL, 0);
+                        set_icon_text(lbl_icon_check, "\uF252", LV_PALETTE_TEAL, 0);
                         set_estado_check("Llavero detectado. Comunicando con Séneca, espere por favor...");
                         lv_scr_load(scr_check);
                         state = CARD_PRESENT;
@@ -545,87 +545,84 @@ void initialize_gui() {
 
 void create_scr_splash() {
     // CREAR PANTALLA DE ARRANQUE (splash screen)
-    scr_splash = lv_obj_create(nullptr, nullptr);
-    lv_obj_set_style_bg_color(scr_splash, 0, LV_STATE_DEFAULT, LV_COLOR_MAKE(255, 255, 255));
+    scr_splash = lv_obj_create(nullptr);
+    lv_obj_set_style_bg_color(scr_splash, LV_COLOR_MAKE(255, 255, 255), LV_PART_MAIN);
 
     // Logo de la CED centrado
     LV_IMG_DECLARE(logo_ced);
-    lv_obj_t *img = lv_img_create(scr_splash, nullptr);
+    lv_obj_t *img = lv_img_create(scr_splash);
     lv_img_set_src(img, &logo_ced);
-    lv_obj_align(img, nullptr, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_align(img, LV_ALIGN_CENTER, 0, 0);
 
     // Spinner para indicar operación en progreso en la esquina inferior derecha
     lv_obj_t *spinner = lv_spinner_create(scr_splash, 1000, 45);
     lv_obj_set_size(spinner, 50, 50);
-    lv_obj_align(spinner, nullptr, LV_ALIGN_IN_BOTTOM_RIGHT, -10, -10);
+    lv_obj_align(spinner, LV_ALIGN_BOTTOM_RIGHT, -10, -10);
 
     // Etiqueta de estado actual centrada en la parte superior
-    lbl_estado_splash = lv_label_create(scr_splash, nullptr);
-    lv_obj_set_style_text_font(lbl_estado_splash, LV_PART_MAIN, LV_STATE_DEFAULT, &mulish_24);
-    lv_obj_set_style_text_align(lbl_estado_splash, LV_PART_MAIN, LV_STATE_DEFAULT, LV_TEXT_ALIGN_CENTER);
+    lbl_estado_splash = lv_label_create(scr_splash);
+    lv_obj_set_style_text_font(lbl_estado_splash, &mulish_24, LV_PART_MAIN);
+    lv_obj_set_style_text_align(lbl_estado_splash, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
     set_estado_splash("Inicializando...");
 
     // Etiqueta de dirección IP actual centrada en la parte inferior
-    lbl_ip_splash = lv_label_create(scr_splash, nullptr);
-    lv_obj_set_style_text_font(lbl_ip_splash, LV_PART_MAIN, LV_STATE_DEFAULT, &mulish_16);
-    lv_obj_set_style_text_align(lbl_ip_splash, LV_PART_MAIN, LV_STATE_DEFAULT, LV_TEXT_ALIGN_CENTER);
+    lbl_ip_splash = lv_label_create(scr_splash);
+    lv_obj_set_style_text_font(lbl_ip_splash, &mulish_16, LV_PART_MAIN);
+    lv_obj_set_style_text_align(lbl_ip_splash, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
     set_ip_splash("Esperando configuración");
 
     // Etiqueta de versión del software en la esquina inferior izquierda
-    lv_obj_t *lbl_version = lv_label_create(scr_splash, nullptr);
-    lv_obj_set_style_text_font(lbl_version, LV_PART_MAIN, LV_STATE_DEFAULT, &mulish_16);
-    lv_obj_set_style_text_align(lbl_version, LV_PART_MAIN, LV_STATE_DEFAULT, LV_TEXT_ALIGN_LEFT);
+    lv_obj_t *lbl_version = lv_label_create(scr_splash);
+    lv_obj_set_style_text_font(lbl_version, &mulish_16, LV_PART_MAIN);
+    lv_obj_set_style_text_align(lbl_version, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
     lv_label_set_text(lbl_version, PUNTO_CONTROL_VERSION);
-    lv_obj_align(lbl_version, nullptr, LV_ALIGN_IN_BOTTOM_LEFT, 10, -10);
+    lv_obj_align(lbl_version, LV_ALIGN_BOTTOM_LEFT, 10, -10);
 }
 
 void create_scr_main() {
     // CREAR PANTALLA PRINCIPAL
-    scr_main = lv_obj_create(nullptr, nullptr);
-    lv_obj_set_style_bg_color(scr_main, 0, LV_STATE_DEFAULT, LV_COLOR_MAKE(255, 255, 255));
+    scr_main = lv_obj_create(nullptr);
+    lv_obj_set_style_bg_color(scr_main, LV_COLOR_MAKE(255, 255, 255), LV_PART_MAIN);
 
     // Etiqueta de hora y fecha actual centrada en la parte superior
-    lbl_hora_main = lv_label_create(scr_main, nullptr);
-    lv_obj_set_style_text_font(lbl_hora_main, LV_PART_MAIN, LV_STATE_DEFAULT, &mulish_64_numbers);
-    lv_obj_set_style_text_align(lbl_hora_main, LV_PART_MAIN, LV_STATE_DEFAULT, LV_TEXT_ALIGN_CENTER);
-    lbl_fecha_main = lv_label_create(scr_main, nullptr);
-    lv_obj_set_style_text_font(lbl_fecha_main, LV_PART_MAIN, LV_STATE_DEFAULT, &mulish_24);
-    lv_obj_set_style_text_color(lbl_fecha_main, LV_PART_MAIN, LV_STATE_DEFAULT,
-                                lv_color_get_palette_main(LV_COLOR_PALETTE_GREY));
-    lv_obj_set_style_text_align(lbl_fecha_main, LV_PART_MAIN, LV_STATE_DEFAULT, LV_TEXT_ALIGN_CENTER);
+    lbl_hora_main = lv_label_create(scr_main);
+    lv_obj_set_style_text_font(lbl_hora_main, &mulish_64_numbers, LV_PART_MAIN);
+    lv_obj_set_style_text_align(lbl_hora_main, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+    lbl_fecha_main = lv_label_create(scr_main);
+    lv_obj_set_style_text_font(lbl_fecha_main, &mulish_24, LV_PART_MAIN);
+    lv_obj_set_style_text_color(lbl_fecha_main, lv_palette_main(LV_PALETTE_GREY), LV_PART_MAIN);
+    lv_obj_set_style_text_align(lbl_fecha_main, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
     set_hora_main("");
     set_fecha_main("");
 
     // Etiqueta de estado centrada en pantalla
-    lbl_estado_main = lv_label_create(scr_main, nullptr);
-    lv_obj_set_style_text_font(lbl_estado_main, LV_PART_MAIN, LV_STATE_DEFAULT, &mulish_32);
-    lv_obj_set_style_text_color(lbl_estado_main, LV_PART_MAIN, LV_STATE_DEFAULT,
-                                lv_color_get_palette_main(LV_COLOR_PALETTE_BLUE_GREY));
-    lv_obj_set_style_text_align(lbl_estado_main, LV_PART_MAIN, LV_STATE_DEFAULT, LV_TEXT_ALIGN_CENTER);
+    lbl_estado_main = lv_label_create(scr_main);
+    lv_obj_set_style_text_font(lbl_estado_main, &mulish_32, LV_PART_MAIN);
+    lv_obj_set_style_text_color(lbl_estado_main, lv_palette_main(LV_PALETTE_BLUE_GREY), LV_PART_MAIN);
+    lv_obj_set_style_text_align(lbl_estado_main, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
     set_estado_main("");
 
     // Imagen de la flecha en la parte inferior
-    lbl_icon_main = lv_label_create(scr_main, nullptr);
-    lv_obj_set_style_text_font(lbl_icon_main, LV_PART_MAIN, LV_STATE_DEFAULT, &symbols);
-    set_icon_text(lbl_icon_main, "\uF063", LV_COLOR_PALETTE_BLUE, 1);
+    lbl_icon_main = lv_label_create(scr_main);
+    lv_obj_set_style_text_font(lbl_icon_main, &symbols, LV_PART_MAIN);
+    set_icon_text(lbl_icon_main, "\uF063", LV_PALETTE_BLUE, 1);
 }
 
 void create_scr_check() {
     // CREAR PANTALLA DE COMPROBACIÓN
-    scr_check = lv_obj_create(nullptr, nullptr);
-    lv_obj_set_style_bg_color(scr_check, 0, LV_STATE_DEFAULT, LV_COLOR_MAKE(255, 255, 255));
+    scr_check = lv_obj_create(nullptr);
+    lv_obj_set_style_bg_color(scr_check, LV_COLOR_MAKE(255, 255, 255), LV_PART_MAIN);
 
     // Icono del estado de comprobación
-    lbl_icon_check = lv_label_create(scr_check, nullptr);
-    lv_obj_set_style_text_font(lbl_icon_check, LV_PART_MAIN, LV_STATE_DEFAULT, &symbols);
-    set_icon_text(lbl_icon_check, "\uF252", LV_COLOR_PALETTE_BLUE, 0);
+    lbl_icon_check = lv_label_create(scr_check);
+    lv_obj_set_style_text_font(lbl_icon_check, &symbols, LV_PART_MAIN);
+    set_icon_text(lbl_icon_check, "\uF252", LV_PALETTE_BLUE, 0);
 
     // Etiqueta de estado de comprobación
-    lbl_estado_check = lv_label_create(scr_check, nullptr);
-    lv_obj_set_style_text_font(lbl_estado_check, LV_PART_MAIN, LV_STATE_DEFAULT, &mulish_32);
-    lv_obj_set_style_text_color(lbl_estado_check, LV_PART_MAIN, LV_STATE_DEFAULT,
-                                lv_color_get_palette_main(LV_COLOR_PALETTE_BLUE_GREY));
-    lv_obj_set_style_text_align(lbl_estado_check, LV_PART_MAIN, LV_STATE_DEFAULT, LV_TEXT_ALIGN_CENTER);
+    lbl_estado_check = lv_label_create(scr_check);
+    lv_obj_set_style_text_font(lbl_estado_check, &mulish_32, LV_PART_MAIN);
+    lv_obj_set_style_text_color(lbl_estado_check, lv_palette_main(LV_PALETTE_BLUE_GREY), LV_PART_MAIN);
+    lv_obj_set_style_text_align(lbl_estado_check, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
     lv_label_set_long_mode(lbl_estado_check, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(lbl_estado_check, SCREEN_WIDTH * 9 / 10);
     set_estado_check("");
