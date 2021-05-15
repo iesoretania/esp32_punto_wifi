@@ -57,13 +57,19 @@ static lv_obj_t *scr_check;      // Pantalla de comprobación
 static lv_obj_t *lbl_estado_check;
 static lv_obj_t *lbl_icon_check;
 
+static lv_obj_t *scr_login;      // Pantalla de entrada de credenciales
+
 static lv_obj_t *scr_config;     // Pantalla de configuración
+
+static lv_obj_t *kb;             // Teclado en pantalla
 
 void create_scr_splash();
 
 void create_scr_main();
 
 void create_scr_check();
+
+void create_scr_login();
 
 void initialize_gui();
 
@@ -500,10 +506,11 @@ void setup() {
     // Inicializar GUI
     initialize_gui();
 
-    // Crear pantalla de arranque y cambiar a ella
+    // Crear pantallas y cambiar a la pantalla de arranque
     create_scr_splash();
     create_scr_main();
     create_scr_check();
+    create_scr_login();
     lv_scr_load(scr_splash);
 
     // Inicializar WiFi
@@ -628,6 +635,83 @@ void create_scr_check() {
     set_estado_check("");
 }
 
+void create_scr_login() {
+    // CREAR PANTALLA DE ENTRADA DE CREDENCIALES
+    scr_login = lv_obj_create(nullptr);
+    lv_obj_set_style_bg_color(scr_login, LV_COLOR_MAKE(255, 255, 255), LV_PART_MAIN);
+
+    // crear teclado
+    kb = lv_keyboard_create(lv_scr_act());
+    lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
+
+    // crear panel del formulario
+    lv_obj_t *pnl_login = lv_obj_create(scr_login);
+    lv_obj_set_height(pnl_login, LV_SIZE_CONTENT);
+    lv_obj_set_width(pnl_login, lv_pct(90));
+
+    static lv_style_t style_text_muted;
+    static lv_style_t style_title;
+
+    lv_style_init(&style_title);
+    lv_style_set_text_font(&style_title, &mulish_24);
+
+    lv_style_init(&style_text_muted);
+    lv_style_set_text_opa(&style_text_muted, LV_OPA_50);
+
+    lv_obj_t *lbl_titulo_login = lv_label_create(pnl_login);
+    lv_label_set_text(lbl_titulo_login, "Activar punto de acceso WiFi");
+    lv_obj_add_style(lbl_titulo_login, &style_title, LV_PART_MAIN);
+
+    lv_obj_t *lbl_usuario_login = lv_label_create(pnl_login);
+    lv_label_set_text(lbl_usuario_login, "Usuario IdEA");
+    lv_obj_add_style(lbl_usuario_login, &style_text_muted, LV_PART_MAIN);
+
+    lv_obj_t *txt_usuario_login = lv_textarea_create(pnl_login);
+    lv_textarea_set_one_line(txt_usuario_login, true);
+    lv_textarea_set_placeholder_text(txt_usuario_login, "Personal directivo/administrativo");
+    //lv_obj_add_event_cb(txt_usuario_login, ta_event_cb, LV_EVENT_ALL, kb);
+
+    lv_obj_t *lbl_password_login = lv_label_create(pnl_login);
+    lv_label_set_text(lbl_password_login, "Contraseña");
+    lv_obj_add_style(lbl_password_login, &style_text_muted, LV_PART_MAIN);
+
+    lv_obj_t *txt_password_login = lv_textarea_create(pnl_login);
+    lv_textarea_set_one_line(txt_password_login, true);
+    lv_textarea_set_password_mode(txt_password_login, true);
+    lv_textarea_set_placeholder_text(txt_password_login, "No se almacenará");
+    //lv_obj_add_event_cb(txt_password, ta_event_cb, LV_EVENT_ALL, kb);
+
+    lv_obj_t *btn_login = lv_btn_create(pnl_login);
+    lv_obj_add_state(btn_login, LV_STATE_DISABLED);
+    lv_obj_set_height(btn_login, LV_SIZE_CONTENT);
+
+    lv_obj_t *lbl_login = lv_label_create(btn_login);
+    lv_label_set_text(lbl_login, "Iniciar sesión");
+    lv_obj_center(lbl_login);
+
+    static lv_coord_t grid_login_col_dsc[] = {LV_GRID_FR(1), LV_GRID_FR(3), LV_GRID_TEMPLATE_LAST};
+    static lv_coord_t grid_login_row_dsc[] = {
+            LV_GRID_CONTENT,  /* Título */
+            5,                /* Separador */
+            LV_GRID_CONTENT,  /* Usuario */
+            5,                /* Separador */
+            LV_GRID_CONTENT,  /* Contraseña */
+            5,                /* Separador */
+            LV_GRID_CONTENT,  /* Botón */
+            LV_GRID_TEMPLATE_LAST
+    };
+
+    lv_obj_set_grid_dsc_array(pnl_login, grid_login_col_dsc, grid_login_row_dsc);
+
+    lv_obj_set_grid_cell(lbl_titulo_login, LV_GRID_ALIGN_START, 0, 2, LV_GRID_ALIGN_CENTER, 0, 1);
+    lv_obj_set_grid_cell(lbl_usuario_login, LV_GRID_ALIGN_START, 0, 1, LV_GRID_ALIGN_START, 2, 1);
+    lv_obj_set_grid_cell(txt_usuario_login, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_START, 2, 1);
+    lv_obj_set_grid_cell(lbl_password_login, LV_GRID_ALIGN_START, 0, 1, LV_GRID_ALIGN_START, 4, 1);
+    lv_obj_set_grid_cell(txt_password_login, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_START, 4, 1);
+    lv_obj_set_grid_cell(btn_login, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_START, 6, 1);
+
+    lv_obj_center(pnl_login);
+}
 
 void loop() {
     lv_task_handler();
