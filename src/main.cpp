@@ -10,7 +10,6 @@
 #include <HTTPClient.h>
 #include <MFRC522.h>
 #include <TinyXML.h>
-
 #include <ArduinoNvs.h>
 
 #define SCREEN_WIDTH 480
@@ -262,24 +261,37 @@ String iso_8859_1_to_utf8(String &str) {
     return strOut;
 }
 
-int send_seneca_request(String url, String body, String cookie) {
-    int ok = 0;
-
+int send_seneca_request_data(String &url, String &body, String &cookie) {
     // preparar petición
     client.begin(url);
 
     // añadir cabeceras
     client.addHeader("Cookie", NVS.getString("cookie") + "; " + cookie);
-    client.addHeader("Content-Type", "application/x-www-form-urlencoded");
+
+    if (body.length() > 0) {
+        client.addHeader("Content-Type", "application/x-www-form-urlencoded");
+    }
+
     client.addHeader("Accept", "text/html");
     client.addHeader("Accept-Encoding", "identity");
 
-    // hacer POST
-    int result = client.POST(body);
+    // hacer POST si hay body, GET si está vacío
+    int result = body.length() > 0 ? client.POST(body) : client.GET();
+    response = client.getString();
+
+    client.end();
+
+    return result;
+}
+
+int send_seneca_request(String url, String body, String cookie) {
+    int ok = 0;
+
+    int result = send_seneca_request_data(url, body, cookie);
+
     if (result == 200) {
         // petición exitosa, extraer mensaje con la respuesta
         int index, index2;
-        response = client.getString();
 
         // la respuesta está dentro de una etiqueta <strong>, no me lo cambiéis :)
         index = response.indexOf("<strong>");
@@ -319,8 +331,6 @@ int send_seneca_request(String url, String body, String cookie) {
         set_icon_text(lbl_icon_check, "\uF071", LV_PALETTE_ORANGE, 0);
         set_estado_check("Ha ocurrido un error en la comunicación con Séneca.");
     }
-
-    client.end();
 
     return ok; // 0 = error
 }
@@ -377,8 +387,10 @@ void process_token(String uid) {
     if (resultCode == 200) {
         // almacenar cookie de sesión
         cookie = client.header("Set-Cookie");
+
         // nos quedamos con la última cookie de la cabecera, que es la de JSESSION
         cookie = cookie.substring(0, cookie.indexOf(";"));
+
         response = client.getString();
 
         // análisis XML del HTML devuelto para extraer los valores de los campos ocultos
@@ -579,14 +591,14 @@ void initialize_gui() {
     indev_drv.read_cb = espi_touch_read;
     lv_indev_drv_register(&indev_drv);
 
-    uint16_t calData[5];
+    /*uint16_t calData[5];
 
     tft.calibrateTouch(calData, TFT_MAGENTA, TFT_BLACK, 15);
 
-    tft.setTouch(calData);
+    tft.setTouch(calData);*/
 }
 
-static void ta_login_event_cb(lv_event_t *e) {
+static void ta_login_form_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
     lv_obj_t *ta = lv_event_get_target(e);
     lv_obj_t *kb = (lv_obj_t *) lv_event_get_user_data(e);
@@ -739,7 +751,7 @@ void create_scr_login() {
     txt_usuario_login = lv_textarea_create(pnl_login);
     lv_textarea_set_one_line(txt_usuario_login, true);
     lv_textarea_set_placeholder_text(txt_usuario_login, "Personal directivo/administrativo");
-    lv_obj_add_event_cb(txt_usuario_login, ta_login_event_cb, LV_EVENT_ALL, kb);
+    lv_obj_add_event_cb(txt_usuario_login, ta_login_form_event_cb, LV_EVENT_ALL, kb);
 
     // Campo de contraseña
     lv_obj_t *lbl_password_login = lv_label_create(pnl_login);
@@ -750,12 +762,14 @@ void create_scr_login() {
     lv_textarea_set_one_line(txt_password_login, true);
     lv_textarea_set_password_mode(txt_password_login, true);
     lv_textarea_set_placeholder_text(txt_password_login, "No se almacenará");
-    lv_obj_add_event_cb(txt_password_login, ta_login_event_cb, LV_EVENT_ALL, kb);
+    lv_obj_add_event_cb(txt_password_login, ta_login_form_event_cb, LV_EVENT_ALL, kb);
 
     // Botón de inicio de sesión
     btn_login = lv_btn_create(pnl_login);
     lv_obj_add_state(btn_login, LV_STATE_DISABLED);
     lv_obj_set_height(btn_login, LV_SIZE_CONTENT);
+    //lv_obj_add_event_cb(btn_login, ta_login_submit_event_cb, LV_EVENT_CLICKED);
+
 
     lv_obj_t *lbl_login = lv_label_create(btn_login);
     lv_label_set_text(lbl_login, "Iniciar sesión");
