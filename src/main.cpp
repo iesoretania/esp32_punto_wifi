@@ -7,10 +7,11 @@
 #include <TFT_eSPI.h>
 #include <WiFi.h>
 #include <lwip/apps/sntp.h>
-#include <HTTPClient.h>
 #include <MFRC522.h>
 #include <TinyXML.h>
 #include <ArduinoNvs.h>
+#include <mbedtls/bignum.h>
+#include <esp_http_client.h>
 
 #define SCREEN_WIDTH 480
 #define SCREEN_HEIGHT 320
@@ -26,7 +27,84 @@ ArduinoNvs nvs;
 TinyXML xml;
 uint8_t xmlBuffer[2048];
 
-HTTPClient client;
+// Gestión de peticiones HTTP
+int send_seneca_request_data(String &body);
+
+esp_err_t http_event_handle(esp_http_client_event_t *evt);
+
+esp_err_t err;
+esp_http_client_config_t http_config;
+
+esp_http_client_handle_t http_client;
+String cookieCPP_authToken;
+String cookieCPP_puntToken;
+String cookieJSESSIONID;
+String cookieSenecaP;
+
+typedef enum { HTTP_IDLE, HTTP_ERROR, HTTP_ONGOING, HTTP_DONE } HttpRequestStatus;
+
+HttpRequestStatus http_request_status;
+int http_status_code;
+String response;
+
+esp_err_t http_event_handle(esp_http_client_event_t *evt) {
+    String cookie_value, cookie_name, tmp;
+    int index;
+
+    switch (evt->event_id) {
+        case HTTP_EVENT_ERROR:
+            http_request_status = HTTP_ERROR;
+            break;
+        case HTTP_EVENT_ON_HEADER:
+            if (strcmp(evt->header_key, "Set-Cookie") == 0) {
+                cookie_name = evt->header_value;
+                index = cookie_name.indexOf('=');
+                if (index > -1) {
+                    cookie_name = cookie_name.substring(0, index);
+                    cookie_value = evt->header_value;
+                    index = cookie_value.indexOf(';');
+                    if (index > -1) {
+                        cookie_value = cookie_value.substring(0, index);
+                    }
+                    if (cookie_name.equals("JSESSIONID")) {
+                        cookieJSESSIONID = cookie_value;
+                        break;
+                    }
+                    if (cookie_name.equals("SenecaP")) {
+                        cookieSenecaP = cookie_value;
+                        break;
+                    }
+                    if (cookie_name.equals("CPP-authToken")) {
+                        cookieCPP_authToken = cookie_value;
+                        tmp = NVS.getString("CPP-authToken");
+                        if (tmp.length() == 0) {    // actualizar en flash solamente si no existe
+                            NVS.setString("CPP-authToken", cookieCPP_authToken);
+                        }
+                        break;
+                    }
+                    if (cookie_name.equals("CPP-puntToken")) {
+                        cookieCPP_puntToken = cookie_value;
+                        tmp = NVS.getString("CPP-puntToken");
+                        if (tmp.length() == 0 || !tmp.equals(cookieCPP_puntToken)) {
+                            NVS.setString("CPP-puntToken", cookieCPP_puntToken);
+                        }
+                        break;
+                    }
+                }
+            }
+            break;
+        case HTTP_EVENT_ON_DATA:
+            response += String((char *) evt->data).substring(0, evt->data_len);
+            break;
+        case HTTP_EVENT_ON_FINISH:
+            http_request_status = HTTP_DONE;
+            http_status_code = esp_http_client_get_status_code(evt->client);
+            break;
+        default:
+            break;
+    }
+    return ESP_OK;
+}
 
 /* Flushing en el display */
 void espi_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p) {
@@ -68,6 +146,7 @@ static lv_obj_t *lbl_ip_splash;
 static lv_obj_t *lbl_estado_splash;
 
 static lv_obj_t *scr_main;       // Pantalla principal de lectura de código
+static lv_obj_t *lbl_nombre_main;
 static lv_obj_t *lbl_hora_main;
 static lv_obj_t *lbl_fecha_main;
 static lv_obj_t *lbl_estado_main;
@@ -99,6 +178,8 @@ void task_main(lv_timer_t *);
 
 void initialize_flash();
 
+void initialize_http_client();
+
 void set_icon_text(lv_obj_t *pObj, const char *string, lv_color_t param, int bottom);
 
 void set_estado_splash_format(const char *string, const char *p) {
@@ -121,14 +202,19 @@ void set_ip_splash(const char *string) {
     lv_obj_align(lbl_ip_splash, LV_ALIGN_BOTTOM_MID, 0, -15);
 }
 
+void set_nombre_main(const char *string) {
+    lv_label_set_text(lbl_nombre_main, string);
+    lv_obj_align(lbl_nombre_main, LV_ALIGN_TOP_MID, 0, 15);
+}
+
 void set_hora_main_format(const char *string, const char *p) {
     lv_label_set_text_fmt(lbl_hora_main, string, p);
-    lv_obj_align(lbl_hora_main, LV_ALIGN_TOP_MID, 0, 15);
+    lv_obj_align_to(lbl_hora_main, lbl_nombre_main, LV_ALIGN_OUT_BOTTOM_MID, 0, 15);
 }
 
 void set_hora_main(const char *string) {
     lv_label_set_text(lbl_hora_main, string);
-    lv_obj_align(lbl_hora_main, LV_ALIGN_TOP_MID, 0, 15);
+    lv_obj_align_to(lbl_hora_main, lbl_nombre_main, LV_ALIGN_OUT_BOTTOM_MID, 0, 15);
 }
 
 void set_fecha_main_format(const char *string, const char *p) {
@@ -168,85 +254,6 @@ void set_icon_text(lv_obj_t *label, const char *text, lv_palette_t color, int bo
     lv_obj_align(label, bottom ? LV_ALIGN_BOTTOM_MID : LV_ALIGN_TOP_MID, 0, bottom ? -15 : 15);
 }
 
-void task_wifi_connection(lv_timer_t *timer) {
-    static enum {
-        CONNECTING, NTP_START, NTP_WAIT, CHECKING, CHECK_WAIT, CHECK_RETRY, WAITING, DONE
-    } state = CONNECTING;
-    static int cuenta = 0;
-    static HTTPClient client;
-    static int code;
-    IPAddress ip;
-
-    switch (state) {
-        case DONE:
-            lv_timer_del(timer);
-            return;
-        case CONNECTING:
-            if (WiFi.status() == WL_CONNECTED) {
-                state = NTP_START;
-                set_ip_splash_format("IP: %s", WiFi.localIP().toString().c_str());
-                set_estado_splash("Comprobando conectividad Andared...");
-                code = WiFi.hostByName("c0", ip);
-            } else {
-                cuenta++;
-            }
-            break;
-        case NTP_START:
-            set_estado_splash("Ajustando hora...");
-            setenv("TZ", PUNTO_CONTROL_HUSO_HORARIO, 1);
-            tzset();
-            sntp_setoperatingmode(SNTP_OPMODE_POLL);
-            if (code != 1) {
-                sntp_setservername(0, (char *) PUNTO_CONTROL_NTP_SERVER);
-            } else {
-                sntp_setservername(0, (char *) "c0");
-            }
-            sntp_init();
-            state = NTP_WAIT;
-            break;
-        case NTP_WAIT:
-            if (sntp_get_sync_status() == SNTP_SYNC_STATUS_COMPLETED) {
-                state = CHECKING;
-                cuenta = 0;
-            }
-            break;
-        case CHECKING:
-            set_estado_splash("Comprobando acceso a Séneca...");
-            state = CHECK_WAIT;
-            break;
-        case CHECK_WAIT:
-            client.begin(PUNTO_CONTROL_URL);
-            client.setReuse(false);
-            code = client.GET();
-            if (code != 200) {
-                set_estado_splash("Error de acceso. Reintentando");
-                state = CHECK_RETRY;
-            } else {
-                set_estado_splash("Acceso a Séneca confirmado");
-                state = WAITING;
-            }
-            client.end();
-            cuenta = 0;
-            break;
-        case CHECK_RETRY:
-            cuenta++;
-            if (cuenta == 10) {
-                state = CHECKING;
-            }
-            break;
-        case WAITING:
-            cuenta++;
-            if (cuenta == 20) {
-                state = DONE;
-                lv_scr_load(scr_main);
-                lv_obj_clean(scr_splash);
-                lv_timer_create(task_main, 100, nullptr);
-            }
-    }
-}
-
-String response;
-
 String iso_8859_1_to_utf8(String &str) {
     String strOut;
     for (int i = 0; i < str.length(); i++) {
@@ -261,35 +268,49 @@ String iso_8859_1_to_utf8(String &str) {
     return strOut;
 }
 
-int send_seneca_request_data(String &url, String &body, String &cookie) {
-    // preparar petición
-    client.begin(url);
+int send_seneca_request_data(String &body) {
+    // preparar cookies de petición
+    String http_cookie = "";
 
-    // añadir cabeceras
-    client.addHeader("Cookie", NVS.getString("cookie") + "; " + cookie);
+    if (cookieCPP_authToken && cookieCPP_authToken.length() > 0) {
+        http_cookie = cookieCPP_authToken;
 
-    if (body.length() > 0) {
-        client.addHeader("Content-Type", "application/x-www-form-urlencoded");
+        if (cookieCPP_puntToken && cookieCPP_puntToken.length() > 0) {
+            http_cookie += "; " + cookieCPP_puntToken;
+        }
+        if (cookieSenecaP && cookieSenecaP.length() > 0) {
+            http_cookie += "; " + cookieSenecaP;
+        }
+        if (cookieJSESSIONID && cookieJSESSIONID.length() > 0) {
+            http_cookie += "; " + cookieJSESSIONID;
+        }
     }
 
-    client.addHeader("Accept", "text/html");
-    client.addHeader("Accept-Encoding", "identity");
+    // añadir cabeceras
+    esp_http_client_set_header(http_client, "Cookie", http_cookie.c_str());
 
-    // hacer POST si hay body, GET si está vacío
-    int result = body.length() > 0 ? client.POST(body) : client.GET();
-    response = client.getString();
+    if (body.length() > 0) {
+        esp_http_client_set_header(http_client, "Content-Type", "application/x-www-form-urlencoded");
+        esp_http_client_set_method(http_client, HTTP_METHOD_POST);
+        esp_http_client_set_post_field(http_client, body.c_str(), (int) body.length());
+    } else {
+        esp_http_client_set_method(http_client, HTTP_METHOD_GET);
+    }
 
-    client.end();
+    esp_http_client_set_header(http_client, "Accept", "text/html");
+    esp_http_client_set_header(http_client, "Accept-Encoding", "identity");
 
-    return result;
+    http_status_code = 0;
+    http_request_status = HTTP_ONGOING;
+
+    // hacer la petición
+    return esp_http_client_perform(http_client);
 }
 
-int send_seneca_request(String url, String body, String cookie) {
+int parse_seneca_response() {
     int ok = 0;
 
-    int result = send_seneca_request_data(url, body, cookie);
-
-    if (result == 200) {
+    if (http_status_code == 200) {
         // petición exitosa, extraer mensaje con la respuesta
         int index, index2;
 
@@ -336,7 +357,7 @@ int send_seneca_request(String url, String body, String cookie) {
 }
 
 // Estado del parser XML
-String modo, punto, xCentro, cookie;
+String modo, punto, xCentro, nombre_punto;
 
 int xmlStatus;
 String xml_current_input;
@@ -346,8 +367,11 @@ void xml_cookie_callback(uint8_t statusflags, char *tagName, uint16_t tagNameLen
     if ((statusflags & STATUS_START_TAG) && strstr(tagName, "input")) {
         xmlStatus = 1;
     }
-    if ((statusflags & STATUS_END_TAG) && strstr(tagName, "input")) {
+    if ((statusflags & STATUS_END_TAG) && (strstr(tagName, "input") || strstr(tagName, "h1"))) {
         xmlStatus = 0;
+    }
+    if ((statusflags & STATUS_START_TAG) && strstr(tagName, "h1")) {
+        xmlStatus = 2;
     }
 
     // si estamos dentro de una etiqueta input, buscar el atributo "name" y "value"
@@ -366,69 +390,134 @@ void xml_cookie_callback(uint8_t statusflags, char *tagName, uint16_t tagNameLen
             }
         }
     }
+
+    // si estamos dentro de una etiqueta <h1>, obtener nombre del punto de control
+    if (xmlStatus == 2 && statusflags & STATUS_TAG_TEXT) {
+        nombre_punto = data;
+    }
 }
 
 void process_token(String uid) {
-    // obtener cookie de sesión
-    const char *headerKeys[] = {"Set-Cookie"};
-    size_t headerKeysSize = sizeof(headerKeys) / sizeof(char *);
+    // enviar token a Séneca
+    String params =
+            "_MODO_=" + modo + "&PUNTO=" + punto + "&X_CENTRO=" + xCentro + "&C_TIPACCCONTPRE=&DARK_MODE=N&TOKEN=" +
+            uid;
+    send_seneca_request_data(params);
+}
 
-    // obtener página web
-    client.begin(PUNTO_CONTROL_URL);
-    client.addHeader("Cookie", NVS.getString("cookie"));
-    client.addHeader("Accept", "text/html");
-    client.addHeader("Accept-Encoding", "identity");
+void process_seneca_response() {
+    // análisis XML del HTML devuelto para extraer los valores de los campos ocultos
+    xml.init(xmlBuffer, 2048, xml_cookie_callback);
 
-    client.collectHeaders(headerKeys, headerKeysSize);
+    // inicialmente no hay etiqueta abierta, procesar carácter a carácter
+    xmlStatus = 0;
+    char *cadena = const_cast<char *>(response.c_str());
+    while (*cadena != 0) {
+        xml.processChar(*cadena);
+        cadena++;
+    }
 
-    int resultCode = client.GET();
+    // reiniciar parser XML
+    xmlStatus = 0;
+    xml.reset();
 
-    // si se ha recibido con éxito
-    if (resultCode == 200) {
-        // almacenar cookie de sesión
-        cookie = client.header("Set-Cookie");
+    if (!nombre_punto.isEmpty()) {
+        set_nombre_main(nombre_punto.c_str());
+    }
+}
 
-        // nos quedamos con la última cookie de la cabecera, que es la de JSESSION
-        cookie = cookie.substring(0, cookie.indexOf(";"));
+void task_wifi_connection(lv_timer_t *timer) {
+    static enum {
+        CONNECTING, NTP_START, NTP_WAIT, CHECKING, CHECK_WAIT, CHECK_RETRY, WAITING, DONE
+    } state = CONNECTING;
 
-        response = client.getString();
+    static int cuenta = 0;
+    static int code;
+    IPAddress ip;
 
-        // análisis XML del HTML devuelto para extraer los valores de los campos ocultos
-        xml.init(xmlBuffer, 2048, xml_cookie_callback);
+    String body = "";
 
-        // inicialmente no hay etiqueta abierta, procesar carácter a carácter
-        xmlStatus = 0;
-        char *cadena = const_cast<char *>(response.c_str());
-        while (*cadena != 0) {
-            xml.processChar(*cadena);
-            cadena++;
-        }
+    switch (state) {
+        case DONE:
+            lv_timer_del(timer);
+            return;
+        case CONNECTING:
+            if (WiFi.status() == WL_CONNECTED) {
+                state = NTP_START;
+                set_ip_splash_format("IP: %s", WiFi.localIP().toString().c_str());
+                set_estado_splash("Comprobando conectividad Andared...");
+                code = WiFi.hostByName("c0", ip);
+            } else {
+                cuenta++;
+            }
+            break;
+        case NTP_START:
+            set_estado_splash("Ajustando hora...");
+            setenv("TZ", PUNTO_CONTROL_HUSO_HORARIO, 1);
+            tzset();
+            sntp_setoperatingmode(SNTP_OPMODE_POLL);
+            if (code != 1) {
+                sntp_setservername(0, (char *) PUNTO_CONTROL_NTP_SERVER);
+            } else {
+                sntp_setservername(0, (char *) "c0");
+            }
+            sntp_init();
+            state = NTP_WAIT;
+            break;
+        case NTP_WAIT:
+            if (sntp_get_sync_status() == SNTP_SYNC_STATUS_COMPLETED) {
+                state = CHECKING;
+                cuenta = 0;
+            }
+            break;
+        case CHECKING:
+            set_estado_splash("Comprobando acceso a Séneca...");
 
-        // reiniciar parser XML
-        xmlStatus = 0;
-        xml.reset();
+            response = "";
+            http_request_status = HTTP_ONGOING;
+            http_status_code = 0;
 
-        // finalizar petición HTTP
-        client.end();
+            send_seneca_request_data(body);
 
-        // enviar token a Séneca
-        String params =
-                "_MODO_=" + modo + "&PUNTO=" + punto + "&X_CENTRO=" + xCentro + "&C_TIPACCCONTPRE=&DARK_MODE=N&TOKEN=" +
-                uid;
-
-        send_seneca_request(PUNTO_CONTROL_URL, params, cookie);
-    } else {
-        client.end();
+            state = CHECK_WAIT;
+            break;
+        case CHECK_WAIT:
+            if (http_request_status == HTTP_ONGOING) {
+                break;
+            }
+            if (http_request_status != HTTP_DONE || http_status_code != 200) {
+                set_estado_splash("Error de acceso. Reintentando");
+                state = CHECK_RETRY;
+            } else {
+                set_estado_splash("Acceso a Séneca confirmado");
+                process_seneca_response();
+                state = WAITING;
+            }
+            cuenta = 0;
+            break;
+        case CHECK_RETRY:
+            cuenta++;
+            if (cuenta == 10) {
+                state = CHECKING;
+            }
+            break;
+        case WAITING:
+            cuenta++;
+            if (cuenta == 20) {
+                state = DONE;
+                lv_scr_load(scr_main);
+                lv_obj_clean(scr_splash);
+                lv_timer_create(task_main, 100, nullptr);
+            }
     }
 }
 
 void task_main(lv_timer_t *timer) {
     const char *dia_semana[] = {"Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"};
     static enum {
-        DONE, IDLE, CARD_PRESENT, CHECK_RESULT_WAIT, NO_NETWORK
+        DONE, IDLE, CARD_PRESENT, CHECK_ONGOING, CHECK_RESULT_WAIT, NO_NETWORK
     } state = IDLE;
     static int cuenta = 0;
-    static HTTPClient client;
     static String uidS;
 
     time_t now;
@@ -465,6 +554,7 @@ void task_main(lv_timer_t *timer) {
                         lv_scr_load(scr_check);
                         state = CARD_PRESENT;
                         cuenta = 0;
+                        mfrc522.PICC_HaltA();
                         break;
                     }
                     mfrc522.PICC_HaltA();
@@ -497,11 +587,27 @@ void task_main(lv_timer_t *timer) {
         case CARD_PRESENT:
             process_token(uidS);
             cuenta = 0;
+            state = CHECK_ONGOING;
+            break;
+        case CHECK_ONGOING:
+            if (http_request_status == HTTP_ERROR || (http_request_status == HTTP_DONE && http_status_code != 200)) {
+                cuenta++;
+                if (cuenta % 40 == 0) {
+                    process_token(uidS);
+                }
+                break;
+            }
+            if (http_request_status == HTTP_ONGOING) {
+                break;
+            }
+            process_seneca_response();
+            parse_seneca_response();
             state = CHECK_RESULT_WAIT;
             break;
+
         case CHECK_RESULT_WAIT:
             cuenta++;
-            if (cuenta > 40 || mfrc522.PICC_IsNewCardPresent()) {
+            if (cuenta > 40 || (cuenta > 20 && mfrc522.PICC_IsNewCardPresent())) {
                 state = IDLE;
                 lv_scr_load(scr_main);
             }
@@ -541,6 +647,9 @@ void setup() {
     // Inicializar GUI
     initialize_gui();
 
+    // Inicializar subsistema HTTP
+    initialize_http_client();
+
     // Crear pantallas y cambiar a la pantalla de arranque
     create_scr_splash();
     create_scr_main();
@@ -555,11 +664,26 @@ void setup() {
     lv_timer_create(task_wifi_connection, 100, nullptr);
 }
 
+void initialize_http_client() {
+    http_config.event_handler = http_event_handle;
+    http_config.url = PUNTO_CONTROL_URL;
+
+    http_client = esp_http_client_init(&http_config);
+
+    http_request_status = HTTP_IDLE;
+}
+
 void initialize_flash() {
     NVS.begin();
 
-    if (NVS.getString("cookie") == nullptr) {
-        //NVS.setString("cookie", "...");
+    if (NVS.getInt("PUNTO_CONTROL") == 2) {
+        cookieCPP_authToken = NVS.getString("CPP-authToken");
+        cookieCPP_puntToken = NVS.getString("CPP-puntToken");
+    } else {
+        NVS.eraseAll();
+        NVS.setInt("PUNTO_CONTROL", 2);
+        NVS.setString("CPP-authToken", "");
+        NVS.setString("CPP-puntToken", "");
     }
 }
 
@@ -671,7 +795,13 @@ void create_scr_main() {
     scr_main = lv_obj_create(nullptr);
     lv_obj_set_style_bg_color(scr_main, LV_COLOR_MAKE(255, 255, 255), LV_PART_MAIN);
 
-    // Etiqueta de hora y fecha actual centrada en la parte superior
+    // Etiqueta con el nombre del punto de acceso en la parte superior
+    lbl_nombre_main = lv_label_create(scr_main);
+    lv_obj_set_style_text_font(lbl_nombre_main, &mulish_16, LV_PART_MAIN);
+    lv_obj_set_style_text_color(lbl_nombre_main, lv_palette_main(LV_PALETTE_DEEP_ORANGE), LV_PART_MAIN);
+    lv_obj_set_style_text_align(lbl_nombre_main, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+
+    // Etiqueta de hora y fecha actual centrada justo debajo
     lbl_hora_main = lv_label_create(scr_main);
     lv_obj_set_style_text_font(lbl_hora_main, &mulish_64_numbers, LV_PART_MAIN);
     lv_obj_set_style_text_align(lbl_hora_main, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
