@@ -136,12 +136,11 @@ void espi_touch_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data) {
     /* Establecer coordenadas */
     data->point.x = touchX;
     data->point.y = touchY;
-
-    return;
 }
 
 // Pantallas
 static lv_obj_t *scr_splash;     // Pantalla de inicio (splash screen)
+static lv_obj_t *spinner_splash;
 static lv_obj_t *lbl_ip_splash;
 static lv_obj_t *lbl_estado_splash;
 
@@ -161,6 +160,13 @@ static lv_obj_t *pnl_login;
 static lv_obj_t *txt_usuario_login;
 static lv_obj_t *txt_password_login;
 static lv_obj_t *btn_login;
+static lv_obj_t *lbl_error_login;
+
+static lv_obj_t *scr_selection;  // Pantalla de selección de punto de control
+static lv_obj_t *pnl_selection;
+static lv_obj_t *lst_selection;
+
+static lv_obj_t *scr_calibracion;// Pantalla de calibración de panel táctil
 
 static lv_obj_t *scr_config;     // Pantalla de configuración
 
@@ -172,15 +178,19 @@ void create_scr_check();
 
 void create_scr_login();
 
-void initialize_gui();
+void create_scr_selection();
 
-void task_main(lv_timer_t *);
+void create_scr_calibracion();
+
+void initialize_gui();
 
 void initialize_flash();
 
 void initialize_http_client();
 
-void set_icon_text(lv_obj_t *pObj, const char *string, lv_color_t param, int bottom);
+void task_main(lv_timer_t *);
+
+static void ta_select_form_event_cb(lv_event_t *e);
 
 void set_estado_splash_format(const char *string, const char *p) {
     lv_label_set_text_fmt(lbl_estado_splash, string, p);
@@ -204,12 +214,10 @@ void set_ip_splash(const char *string) {
 
 void set_nombre_main(const char *string) {
     lv_label_set_text(lbl_nombre_main, string);
+    lv_label_set_long_mode(lbl_nombre_main, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    lv_obj_set_width(lbl_nombre_main, SCREEN_WIDTH);
+    lv_obj_set_style_text_align(lbl_nombre_main, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
     lv_obj_align(lbl_nombre_main, LV_ALIGN_TOP_MID, 0, 15);
-}
-
-void set_hora_main_format(const char *string, const char *p) {
-    lv_label_set_text_fmt(lbl_hora_main, string, p);
-    lv_obj_align_to(lbl_hora_main, lbl_nombre_main, LV_ALIGN_OUT_BOTTOM_MID, 0, 15);
 }
 
 void set_hora_main(const char *string) {
@@ -217,29 +225,14 @@ void set_hora_main(const char *string) {
     lv_obj_align_to(lbl_hora_main, lbl_nombre_main, LV_ALIGN_OUT_BOTTOM_MID, 0, 15);
 }
 
-void set_fecha_main_format(const char *string, const char *p) {
-    lv_label_set_text_fmt(lbl_fecha_main, string, p);
-    lv_obj_align_to(lbl_fecha_main, lbl_hora_main, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
-}
-
 void set_fecha_main(const char *string) {
     lv_label_set_text(lbl_fecha_main, string);
     lv_obj_align_to(lbl_fecha_main, lbl_hora_main, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
 }
 
-void set_estado_main_format(const char *string, const char *p) {
-    lv_label_set_text_fmt(lbl_estado_main, string, p);
-    lv_obj_align_to(lbl_estado_main, lbl_fecha_main, LV_ALIGN_OUT_BOTTOM_MID, 0, 20);
-}
-
 void set_estado_main(const char *string) {
     lv_label_set_text(lbl_estado_main, string);
     lv_obj_align_to(lbl_estado_main, lbl_fecha_main, LV_ALIGN_OUT_BOTTOM_MID, 0, 20);
-}
-
-void set_estado_check_format(const char *string, const char *p) {
-    lv_label_set_text_fmt(lbl_estado_check, string, p);
-    lv_obj_align_to(lbl_estado_check, lbl_icon_check, LV_ALIGN_OUT_BOTTOM_MID, 0, 25);
 }
 
 void set_estado_check(const char *string) {
@@ -252,6 +245,10 @@ void set_icon_text(lv_obj_t *label, const char *text, lv_palette_t color, int bo
     lv_label_set_text(label, text);
     lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
     lv_obj_align(label, bottom ? LV_ALIGN_BOTTOM_MID : LV_ALIGN_TOP_MID, 0, bottom ? -15 : 15);
+}
+
+void set_error_login_text(const char *string) {
+    lv_label_set_text(lbl_error_login, string);
 }
 
 String iso_8859_1_to_utf8(String &str) {
@@ -268,23 +265,37 @@ String iso_8859_1_to_utf8(String &str) {
     return strOut;
 }
 
-int send_seneca_request_data(String &body) {
+int send_seneca_data(String &body) {
     // preparar cookies de petición
     String http_cookie = "";
+    int primero = 1;
 
-    if (cookieCPP_authToken && cookieCPP_authToken.length() > 0) {
+    if (!cookieCPP_authToken.isEmpty()) {
         http_cookie = cookieCPP_authToken;
-
-        if (cookieCPP_puntToken && cookieCPP_puntToken.length() > 0) {
-            http_cookie += "; " + cookieCPP_puntToken;
-        }
-        if (cookieSenecaP && cookieSenecaP.length() > 0) {
-            http_cookie += "; " + cookieSenecaP;
-        }
-        if (cookieJSESSIONID && cookieJSESSIONID.length() > 0) {
-            http_cookie += "; " + cookieJSESSIONID;
-        }
+        primero = 0;
     }
+    if (!cookieCPP_puntToken.isEmpty()) {
+        if (!primero) {
+            http_cookie += "; ";
+        }
+        primero = 0;
+        http_cookie +=  cookieCPP_puntToken;
+    }
+    if (!cookieSenecaP.isEmpty()) {
+        if (!primero) {
+            http_cookie += "; ";
+        }
+        primero = 0;
+        http_cookie += cookieSenecaP;
+    }
+    if (!cookieJSESSIONID.isEmpty()) {
+        if (!primero) {
+            http_cookie += "; ";
+        }
+        http_cookie += cookieJSESSIONID;
+    }
+
+    //Serial.println("Cookies enviadas: " + http_cookie);
 
     // añadir cabeceras
     esp_http_client_set_header(http_client, "Cookie", http_cookie.c_str());
@@ -305,6 +316,18 @@ int send_seneca_request_data(String &body) {
 
     // hacer la petición
     return esp_http_client_perform(http_client);
+}
+
+int send_seneca_login_data(String &body) {
+    esp_http_client_set_url(http_client, PUNTO_CONTROL_LOGIN_URL);
+
+    return send_seneca_data(body);
+}
+
+int send_seneca_request_data(String &body) {
+    esp_http_client_set_url(http_client, PUNTO_CONTROL_URL);
+
+    return send_seneca_data(body);
 }
 
 int parse_seneca_response() {
@@ -357,43 +380,66 @@ int parse_seneca_response() {
 }
 
 // Estado del parser XML
-String modo, punto, xCentro, nombre_punto;
+String modo, punto, xCentro, nombre_punto, tipo_acceso, nuevo_punto, usuario;
 
 int xmlStatus;
 String xml_current_input;
 
-void xml_cookie_callback(uint8_t statusflags, char *tagName, uint16_t tagNameLen, char *data, uint16_t dataLen) {
-    // nos quedamos con las etiquetas <input>
-    if ((statusflags & STATUS_START_TAG) && strstr(tagName, "input")) {
-        xmlStatus = 1;
-    }
-    if ((statusflags & STATUS_END_TAG) && (strstr(tagName, "input") || strstr(tagName, "h1"))) {
+void xml_html_callback(uint8_t statusflags, char *tagName, uint16_t tagNameLen, char *data, uint16_t dataLen) {
+    // nos quedamos con las etiquetas <h1> y <a>
+    if ((statusflags & STATUS_END_TAG) && strstr(tagName, "h1")) {
         xmlStatus = 0;
     }
     if ((statusflags & STATUS_START_TAG) && strstr(tagName, "h1")) {
         xmlStatus = 2;
     }
+    if ((statusflags & STATUS_START_TAG) && strlen(tagName) > 2 && tagName[tagNameLen - 1] =='a' && tagName[tagNameLen - 2]  == '/') {
+        xmlStatus = 3;
+    }
+    if ((statusflags & STATUS_END_TAG) && strlen(tagName) > 2 && tagName[tagNameLen - 1] =='a' && tagName[tagNameLen - 2]  == '/') {
+        xmlStatus = 0;
+    }
 
-    // si estamos dentro de una etiqueta input, buscar el atributo "name" y "value"
-    if (xmlStatus == 1) {
-        if ((statusflags & STATUS_ATTR_TEXT) && !strcasecmp(tagName, "name")) {
-            xml_current_input = data;
-        }
-        // campos que nos interesan: _MODO_, PUNTO y X_CENTRO
-        if ((statusflags & STATUS_ATTR_TEXT) && !strcasecmp(tagName, "value")) {
-            if (xml_current_input.equalsIgnoreCase("_MODO_")) {
-                modo = data;
-            } else if (xml_current_input.equalsIgnoreCase("PUNTO")) {
-                punto = data;
-            } else if (xml_current_input.equalsIgnoreCase("X_CENTRO")) {
-                xCentro = data;
-            }
+    // buscar el atributo "name" y "value", que están en input
+    if ((statusflags & STATUS_ATTR_TEXT) && !strcasecmp(tagName, "name")) {
+        xml_current_input = data;
+    }
+
+    // campos que nos interesan: _MODO_, PUNTO y X_CENTRO
+    if ((statusflags & STATUS_ATTR_TEXT) && !strcasecmp(tagName, "value")) {
+        if (xml_current_input.equalsIgnoreCase("_MODO_")) {
+            modo = data;
+        } else if (xml_current_input.equalsIgnoreCase("PUNTO")) {
+            punto = data;
+        } else if (xml_current_input.equalsIgnoreCase("X_CENTRO")) {
+            xCentro = data;
         }
     }
 
     // si estamos dentro de una etiqueta <h1>, obtener nombre del punto de control
     if (xmlStatus == 2 && statusflags & STATUS_TAG_TEXT) {
         nombre_punto = data;
+    }
+
+    // si estamos dentro de una etiqueta <a>, comprobar si es una lista de puntos de control
+    if (xmlStatus == 3 && statusflags & STATUS_ATTR_TEXT && !strcasecmp(tagName, "href") && strstr(data, "activarPuntoAcceso")) {
+        nuevo_punto = data;
+        nuevo_punto = nuevo_punto.substring(31, nuevo_punto.indexOf(')') - 1);
+    }
+
+    if (xmlStatus == 3 && statusflags & STATUS_TAG_TEXT && !nuevo_punto.isEmpty()) {
+        lv_obj_t *btn = lv_list_add_btn(lst_selection, LV_SYMBOL_WIFI, data);
+        char *item = (char *) lv_mem_alloc(nuevo_punto.length() + 1);
+        strcpy(item, nuevo_punto.c_str());
+        lv_obj_add_event_cb(btn, ta_select_form_event_cb, LV_EVENT_CLICKED, item);
+        lv_obj_add_event_cb(btn, ta_select_form_event_cb, LV_EVENT_DELETE, item);
+        nuevo_punto = "";
+        xmlStatus = 0;
+    }
+
+    // encontrar una clase de tipo "login" activa el tipo de acceso de la pantalla de entrada
+    if ((statusflags & STATUS_ATTR_TEXT) && !strcasecmp(tagName, "class") && !strcasecmp(data, "login")) {
+        tipo_acceso = "login";
     }
 }
 
@@ -402,15 +448,19 @@ void process_token(String uid) {
     String params =
             "_MODO_=" + modo + "&PUNTO=" + punto + "&X_CENTRO=" + xCentro + "&C_TIPACCCONTPRE=&DARK_MODE=N&TOKEN=" +
             uid;
+    response = "";
     send_seneca_request_data(params);
 }
 
 void process_seneca_response() {
+    modo = ""; punto = ""; xCentro = ""; nombre_punto = ""; tipo_acceso = "";
+
     // análisis XML del HTML devuelto para extraer los valores de los campos ocultos
-    xml.init(xmlBuffer, 2048, xml_cookie_callback);
+    xml.init(xmlBuffer, 2048, xml_html_callback);
 
     // inicialmente no hay etiqueta abierta, procesar carácter a carácter
     xmlStatus = 0;
+
     char *cadena = const_cast<char *>(response.c_str());
     while (*cadena != 0) {
         xml.processChar(*cadena);
@@ -423,12 +473,14 @@ void process_seneca_response() {
 
     if (!nombre_punto.isEmpty()) {
         set_nombre_main(nombre_punto.c_str());
+    } else {
+        set_nombre_main("Punto de acceso WiFi");
     }
 }
 
 void task_wifi_connection(lv_timer_t *timer) {
     static enum {
-        CONNECTING, NTP_START, NTP_WAIT, CHECKING, CHECK_WAIT, CHECK_RETRY, WAITING, DONE
+        CONNECTING, NTP_START, NTP_WAIT, CHECKING, CHECK_WAIT, CHECK_RETRY, LOGIN_SCREEN, WAITING, DONE
     } state = CONNECTING;
 
     static int cuenta = 0;
@@ -442,6 +494,8 @@ void task_wifi_connection(lv_timer_t *timer) {
             lv_timer_del(timer);
             return;
         case CONNECTING:
+            lv_obj_clear_flag(spinner_splash, LV_OBJ_FLAG_HIDDEN);
+
             if (WiFi.status() == WL_CONNECTED) {
                 state = NTP_START;
                 set_ip_splash_format("IP: %s", WiFi.localIP().toString().c_str());
@@ -472,12 +526,15 @@ void task_wifi_connection(lv_timer_t *timer) {
             break;
         case CHECKING:
             set_estado_splash("Comprobando acceso a Séneca...");
-
             response = "";
             http_request_status = HTTP_ONGOING;
             http_status_code = 0;
 
-            send_seneca_request_data(body);
+            if (!punto.isEmpty()) {
+                process_token("0");
+            } else {
+                send_seneca_request_data(body);
+            }
 
             state = CHECK_WAIT;
             break;
@@ -491,7 +548,19 @@ void task_wifi_connection(lv_timer_t *timer) {
             } else {
                 set_estado_splash("Acceso a Séneca confirmado");
                 process_seneca_response();
-                state = WAITING;
+                if (tipo_acceso.isEmpty()) {
+                    if (!punto.isEmpty()) {
+                        state = WAITING;
+                        lv_obj_add_flag(spinner_splash, LV_OBJ_FLAG_HIDDEN);
+                    } else {
+                        state = LOGIN_SCREEN;
+                        lv_scr_load(scr_selection);
+                    }
+                } else {
+                    state = LOGIN_SCREEN;
+                    http_request_status = HTTP_IDLE;
+                    lv_scr_load(scr_login);
+                }
             }
             cuenta = 0;
             break;
@@ -499,6 +568,31 @@ void task_wifi_connection(lv_timer_t *timer) {
             cuenta++;
             if (cuenta == 10) {
                 state = CHECKING;
+            }
+            break;
+        case LOGIN_SCREEN:
+            cuenta++;
+            if (lv_scr_act() == scr_splash) {
+                cuenta = 0;
+                state = CHECKING;
+            }
+            if (http_request_status == HTTP_DONE) {
+                // procesar respuesta JSON del login
+                if (response.indexOf("<correcto>SI") > -1) {
+                    // es correcta, volver a cargar página principal del punto de acceso con nueva cookie
+                    String param = "_MODO_=" + modo + "&USUARIO=" + usuario + "&CLAVE_P=";
+                    response = "";
+                    send_seneca_request_data(param);
+                    lv_scr_load(scr_splash);
+                    cuenta = 0;
+                    state = CHECK_WAIT;
+                } else {
+                    // error: mostrar mensaje en formulario
+                    String error = response.substring(response.indexOf("<mensaje>") + 9,
+                                                      response.indexOf("</mensaje>"));
+                    set_error_login_text(error.c_str());
+                    http_request_status = HTTP_IDLE;
+                }
             }
             break;
         case WAITING:
@@ -633,6 +727,9 @@ void setup() {
     ledcSetup(1, 5000, 8);
     ledcWrite(1, 255);
 
+    // Inicializar flash
+    initialize_flash();
+
     // Inicializar bus SPI y el TFT conectado a través de él
     SPI.begin();
     tft.begin();            /* Inicializar TFT */
@@ -640,9 +737,6 @@ void setup() {
 
     // Inicializar lector
     mfrc522.PCD_Init();
-
-    // Inicializar flash
-    initialize_flash();
 
     // Inicializar GUI
     initialize_gui();
@@ -655,6 +749,7 @@ void setup() {
     create_scr_main();
     create_scr_check();
     create_scr_login();
+    create_scr_selection();
     lv_scr_load(scr_splash);
 
     // Inicializar WiFi
@@ -676,17 +771,20 @@ void initialize_http_client() {
 void initialize_flash() {
     NVS.begin();
 
-    if (NVS.getInt("PUNTO_CONTROL") == 2) {
+    // Botón Boot: si está pulsado durante el inicio, reinicializar flash
+    pinMode(0, INPUT);
+
+    if (NVS.getInt("PUNTO_CONTROL") == 1 && digitalRead(0) == HIGH) {
         cookieCPP_authToken = NVS.getString("CPP-authToken");
         cookieCPP_puntToken = NVS.getString("CPP-puntToken");
     } else {
-        NVS.eraseAll();
-        NVS.setInt("PUNTO_CONTROL", 2);
+        Serial.println("Borrando flash...");
+        NVS.eraseAll(true);
+        NVS.setInt("PUNTO_CONTROL", 1);
         NVS.setString("CPP-authToken", "");
         NVS.setString("CPP-puntToken", "");
     }
 }
-
 
 void initialize_gui() {
     lv_init();
@@ -708,18 +806,29 @@ void initialize_gui() {
     disp_drv.draw_buf = &disp_buf;
     lv_disp_drv_register(&disp_drv);
 
-    // Inicializar pantalla táctil
+    // Inicializar panel táctil
     static lv_indev_drv_t indev_drv;
     lv_indev_drv_init(&indev_drv);
     indev_drv.type = LV_INDEV_TYPE_POINTER;
     indev_drv.read_cb = espi_touch_read;
     lv_indev_drv_register(&indev_drv);
 
-    /*uint16_t calData[5];
+    uint16_t calData[5];
 
-    tft.calibrateTouch(calData, TFT_MAGENTA, TFT_BLACK, 15);
+    // Obtener datos de calibración del panel táctil
+    if (!NVS.getBlob("CalData", (uint8_t *) calData, sizeof(calData))) {
+        // Cargar pantalla de calibración
+        create_scr_calibracion();
+        lv_scr_load(scr_calibracion);
+        lv_task_handler();
 
-    tft.setTouch(calData);*/
+        tft.calibrateTouch(calData, TFT_RED, TFT_WHITE, 20);
+
+        // Guardar datos de calibración
+        NVS.setBlob("CalData", (uint8_t *) calData, sizeof(calData));
+    }
+
+    tft.setTouch(calData);
 }
 
 static void ta_login_form_event_cb(lv_event_t *e) {
@@ -754,6 +863,87 @@ static void ta_login_form_event_cb(lv_event_t *e) {
     }
 }
 
+static void ta_select_form_event_cb(lv_event_t *e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_CLICKED) {
+        // los datos de usuario contienen el código del punto de control
+        punto = (char *) lv_event_get_user_data(e);
+        set_estado_splash("Activando punto de acceso en Séneca");
+        lv_scr_load(scr_splash);
+    }
+    if (code == LV_EVENT_DELETE) {
+        lv_mem_free(lv_event_get_user_data(e));
+    }
+}
+
+String rsa_cifrar(const char *cadena, const char *e, const char *n) {
+    char buffer[100];
+    size_t buffer_len;
+
+    // resultado = m^e mod n
+    mbedtls_mpi m_m, m_e, m_n, m_resultado;
+    mbedtls_mpi_init(&m_m);
+    mbedtls_mpi_init(&m_e);
+    mbedtls_mpi_init(&m_n);
+    mbedtls_mpi_init(&m_resultado);
+
+    // convertir las cadenas en enteros grandes
+    mbedtls_mpi_read_string(&m_m, 10, cadena);
+    mbedtls_mpi_read_string(&m_e, 10, e);
+    mbedtls_mpi_read_string(&m_n, 10, n);
+    mbedtls_mpi_exp_mod(&m_resultado, &m_m, &m_e, &m_n, nullptr);
+
+    // convertir el entero grande del resultado en cadena
+    mbedtls_mpi_write_string(&m_resultado, 10, buffer, sizeof(buffer), &buffer_len);
+
+    return String(buffer);
+}
+
+static void ta_login_submit_event_cb(lv_event_t *e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_CLICKED) {
+        String datos;
+        usuario = lv_textarea_get_text(txt_usuario_login);
+
+        // La autenticación de Séneca convierte cada carácter del password a su código ASCII y se concatenan
+        // El resultado es el número al que se aplica el cifrado RSA
+        String clave_convertida = "";
+        const char *ptr = lv_textarea_get_text(txt_password_login);
+
+        while(*ptr) {
+            clave_convertida += (int) (*ptr);
+            ptr++;
+        }
+
+        // e y n están sacados del formulario
+        String clave = rsa_cifrar(clave_convertida.c_str(), "3584956249", "356056806984207294102423357623243547284021");
+
+        // generar parámetros del formulario de autenticación
+        datos = "N_V_=NV_" + String(random(10000)) + "&rndval=" + random(100000000) + "&NAV_WEB_NOMBRE=Netscape&NAV_WEB_VERSION=5&RESOLUCION=1024&CLAVECIFRADA="
+                + clave + "&USUARIO=" + usuario + "&C_INTERFAZ=SENECA";
+
+        response = "";
+
+        send_seneca_login_data(datos);
+        set_estado_splash("Activando usuario en Séneca");
+    }
+}
+
+void create_scr_calibracion() {
+    scr_calibracion = lv_obj_create(nullptr);
+    lv_obj_set_style_bg_color(scr_calibracion, LV_COLOR_MAKE(255, 255, 255), LV_PART_MAIN);
+
+    // Etiqueta con instrucciones de calibración
+    lv_obj_t *lbl_calibracion = lv_label_create(scr_calibracion);
+    lv_label_set_text(lbl_calibracion, "Presione las puntas de las flechas rojas con la máxima precisión posible");
+    lv_obj_set_style_text_font(lbl_calibracion, &mulish_32, LV_PART_MAIN);
+    lv_obj_set_style_text_color(lbl_calibracion, lv_palette_main(LV_PALETTE_LIGHT_BLUE), LV_PART_MAIN);
+    lv_obj_set_style_text_align(lbl_calibracion, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+    lv_label_set_long_mode(lbl_calibracion, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(lbl_calibracion, SCREEN_WIDTH * 9 / 10);
+    lv_obj_align(lbl_calibracion, LV_ALIGN_CENTER, 0, 0);
+}
+
 void create_scr_splash() {
     // CREAR PANTALLA DE ARRANQUE (splash screen)
     scr_splash = lv_obj_create(nullptr);
@@ -766,9 +956,9 @@ void create_scr_splash() {
     lv_obj_align(img, LV_ALIGN_CENTER, 0, 0);
 
     // Spinner para indicar operación en progreso en la esquina inferior derecha
-    lv_obj_t *spinner = lv_spinner_create(scr_splash, 1000, 45);
-    lv_obj_set_size(spinner, 50, 50);
-    lv_obj_align(spinner, LV_ALIGN_BOTTOM_RIGHT, -10, -10);
+    spinner_splash = lv_spinner_create(scr_splash, 1000, 45);
+    lv_obj_set_size(spinner_splash, 50, 50);
+    lv_obj_align(spinner_splash, LV_ALIGN_BOTTOM_RIGHT, -10, -10);
 
     // Etiqueta de estado actual centrada en la parte superior
     lbl_estado_splash = lv_label_create(scr_splash);
@@ -797,9 +987,11 @@ void create_scr_main() {
 
     // Etiqueta con el nombre del punto de acceso en la parte superior
     lbl_nombre_main = lv_label_create(scr_main);
+    lv_label_set_text(lbl_nombre_main, "Punto de control WiFi");
     lv_obj_set_style_text_font(lbl_nombre_main, &mulish_16, LV_PART_MAIN);
     lv_obj_set_style_text_color(lbl_nombre_main, lv_palette_main(LV_PALETTE_DEEP_ORANGE), LV_PART_MAIN);
     lv_obj_set_style_text_align(lbl_nombre_main, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+    lv_label_set_long_mode(lbl_nombre_main, LV_LABEL_LONG_SCROLL_CIRCULAR);
 
     // Etiqueta de hora y fecha actual centrada justo debajo
     lbl_hora_main = lv_label_create(scr_main);
@@ -870,7 +1062,7 @@ void create_scr_login() {
 
     // Título del panel
     lv_obj_t *lbl_titulo_login = lv_label_create(pnl_login);
-    lv_label_set_text(lbl_titulo_login, "Activar punto de acceso WiFi");
+    lv_label_set_text(lbl_titulo_login, "Activar punto de control WiFi");
     lv_obj_add_style(lbl_titulo_login, &style_title, LV_PART_MAIN);
 
     // Campo de usuario IdEA
@@ -898,14 +1090,20 @@ void create_scr_login() {
     btn_login = lv_btn_create(pnl_login);
     lv_obj_add_state(btn_login, LV_STATE_DISABLED);
     lv_obj_set_height(btn_login, LV_SIZE_CONTENT);
-    //lv_obj_add_event_cb(btn_login, ta_login_submit_event_cb, LV_EVENT_CLICKED);
-
+    lv_obj_add_event_cb(btn_login, ta_login_submit_event_cb, LV_EVENT_CLICKED, nullptr);
 
     lv_obj_t *lbl_login = lv_label_create(btn_login);
     lv_label_set_text(lbl_login, "Iniciar sesión");
     lv_obj_align(lbl_login, LV_ALIGN_TOP_MID, 0, 0);
 
-    // Colocar elementos en una rejilla (7 filas, 2 columnas)
+    lbl_error_login = lv_label_create(pnl_login);
+    lv_label_set_text(lbl_error_login, "");
+    lv_obj_set_style_text_font(lbl_error_login, &mulish_16, LV_PART_MAIN);
+    lv_obj_set_style_text_color(lbl_error_login, lv_palette_main(LV_PALETTE_RED), LV_PART_MAIN);
+    lv_obj_set_style_text_align(lbl_error_login, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+    lv_label_set_long_mode(lbl_error_login, LV_LABEL_LONG_WRAP);
+
+    // Colocar elementos en una rejilla (9 filas, 2 columnas)
     static lv_coord_t grid_login_col_dsc[] = {LV_GRID_FR(1), LV_GRID_FR(3), LV_GRID_TEMPLATE_LAST};
     static lv_coord_t grid_login_row_dsc[] = {
             LV_GRID_CONTENT,  /* Título */
@@ -915,6 +1113,8 @@ void create_scr_login() {
             LV_GRID_CONTENT,  /* Contraseña */
             5,                /* Separador */
             LV_GRID_CONTENT,  /* Botón */
+            5,                /* Separador */
+            LV_GRID_CONTENT,  /* Etiqueta error */
             LV_GRID_TEMPLATE_LAST
     };
 
@@ -926,10 +1126,46 @@ void create_scr_login() {
     lv_obj_set_grid_cell(lbl_password_login, LV_GRID_ALIGN_START, 0, 1, LV_GRID_ALIGN_CENTER, 4, 1);
     lv_obj_set_grid_cell(txt_password_login, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_START, 4, 1);
     lv_obj_set_grid_cell(btn_login, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_START, 6, 1);
+    lv_obj_set_grid_cell(lbl_error_login, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_START, 8, 1);
 
     // Quitar borde al panel y pegarlo a la parte superior de la pantalla
     lv_obj_set_style_border_width(pnl_login, 0, LV_PART_MAIN);
     lv_obj_align(pnl_login, LV_ALIGN_TOP_MID, 0, 0);
+}
+
+void create_scr_selection() {
+    // CREAR PANTALLA DE SELECCIÓN DE PUNTO DE CONTROL
+    scr_selection = lv_obj_create(nullptr);
+    lv_obj_set_style_bg_color(scr_selection, LV_COLOR_MAKE(255, 255, 255), LV_PART_MAIN);
+
+    // Crear panel del formulario
+    pnl_selection = lv_obj_create(scr_selection);
+    lv_obj_set_height(pnl_selection, LV_VER_RES);
+    lv_obj_set_width(pnl_selection, lv_pct(90));
+
+    static lv_style_t style_text_muted;
+    static lv_style_t style_title;
+
+    lv_style_init(&style_title);
+    lv_style_set_text_font(&style_title, &mulish_24);
+
+    lv_style_init(&style_text_muted);
+    lv_style_set_text_opa(&style_text_muted, LV_OPA_50);
+
+    // Título del panel
+    lv_obj_t *lbl_titulo_selection = lv_label_create(pnl_selection);
+    lv_label_set_text(lbl_titulo_selection, "Seleccionar punto de control");
+    lv_obj_add_style(lbl_titulo_selection, &style_title, LV_PART_MAIN);
+
+    // Lista de puntos de acceso
+    lst_selection = lv_list_create(pnl_selection);
+    lv_obj_set_width(lst_selection, lv_pct(100));
+    lv_obj_set_height(lst_selection, LV_SIZE_CONTENT);
+    lv_obj_align_to(lst_selection, lbl_titulo_selection, LV_ALIGN_TOP_MID, 0, 30);
+
+    // Quitar borde al panel y pegarlo a la parte superior de la pantalla
+    lv_obj_set_style_border_width(pnl_selection, 0, LV_PART_MAIN);
+    lv_obj_align(pnl_selection, LV_ALIGN_TOP_MID, 0, 0);
 }
 
 void loop() {
