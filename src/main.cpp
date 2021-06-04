@@ -142,6 +142,7 @@ static lv_obj_t *spinner_splash;
 static lv_obj_t *lbl_ip_splash;
 static lv_obj_t *lbl_estado_splash;
 static lv_obj_t *lbl_version_splash;
+static lv_obj_t *btn_config_splash;
 
 static lv_obj_t *scr_main;       // Pantalla principal de lectura de código
 static lv_obj_t *lbl_nombre_main;
@@ -149,6 +150,7 @@ static lv_obj_t *lbl_hora_main;
 static lv_obj_t *lbl_fecha_main;
 static lv_obj_t *lbl_estado_main;
 static lv_obj_t *lbl_icon_main;
+static lv_obj_t *btn_config_main;
 
 static lv_obj_t *scr_check;      // Pantalla de comprobación
 static lv_obj_t *lbl_estado_check;
@@ -168,6 +170,12 @@ static lv_obj_t *lst_selection;
 static lv_obj_t *scr_calibracion;// Pantalla de calibración de panel táctil
 
 static lv_obj_t *scr_config;     // Pantalla de configuración
+static lv_obj_t *txt_ssid_config;
+static lv_obj_t *txt_psk_config;
+
+static lv_obj_t *kb;             // Teclado en pantalla
+
+static lv_obj_t *last_scr;
 
 void create_scr_splash();
 
@@ -176,6 +184,8 @@ void create_scr_main();
 void create_scr_check();
 
 void create_scr_login();
+
+void create_scr_config();
 
 void create_scr_selection();
 
@@ -190,6 +200,7 @@ void initialize_http_client();
 void task_main(lv_timer_t *);
 
 static void ta_select_form_event_cb(lv_event_t *e);
+static void ta_config_click_event_cb(lv_event_t *e);
 
 void actualizaHora(void);
 
@@ -252,11 +263,18 @@ void set_error_login_text(const char *string) {
     lv_label_set_text(lbl_error_login, string);
 }
 
-void set_config_label(lv_obj_t *lbl) {
+lv_obj_t *create_config_button(lv_obj_t *parent) {
+    lv_obj_t *btn = lv_btn_create(parent);
+    lv_obj_t *lbl = lv_label_create(btn);
+
+    lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, LV_PART_MAIN);
     lv_obj_set_style_text_font(lbl, &mulish_32, LV_PART_MAIN);
     lv_label_set_text(lbl, LV_SYMBOL_SETTINGS);
     lv_obj_set_style_text_color(lbl, lv_palette_main(LV_PALETTE_INDIGO), LV_PART_MAIN);
-    lv_obj_align(lbl, LV_ALIGN_BOTTOM_LEFT, 10, -10);
+    lv_obj_align_to(btn, parent, LV_ALIGN_BOTTOM_LEFT, 10, -10);
+    lv_obj_add_event_cb(btn, ta_config_click_event_cb, LV_EVENT_CLICKED, scr_main);
+
+    return btn;
 }
 
 String iso_8859_1_to_utf8(String &str) {
@@ -513,7 +531,8 @@ void task_wifi_connection(lv_timer_t *timer) {
                 cuenta++;
                 // si a los 10 segundos no nos hemos conectado, cambiar el número de versión por el icono de config.
                 if (cuenta % 100 == 0) {
-                    set_config_label(lbl_version_splash);
+                    lv_obj_add_flag(lbl_version_splash, LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_clear_flag(btn_config_splash, LV_OBJ_FLAG_HIDDEN);
                 }
             }
             break;
@@ -624,6 +643,9 @@ void task_main(lv_timer_t *timer) {
     } state = IDLE;
     static int cuenta = 0;
     static String uidS;
+
+    // ignorar si no estamos en la pantalla principal
+    if (lv_scr_act() != scr_main) return;
 
     switch (state) {
         case DONE:
@@ -778,6 +800,7 @@ void setup() {
     create_scr_check();
     create_scr_login();
     create_scr_selection();
+    create_scr_config();
     lv_scr_load(scr_splash);
 
     // Inicializar WiFi
@@ -862,10 +885,36 @@ void initialize_gui() {
     tft.setTouch(calData);
 }
 
-static void ta_login_form_event_cb(lv_event_t *e) {
+static void ta_kb_form_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
     lv_obj_t *ta = lv_event_get_target(e);
-    lv_obj_t *kb = (lv_obj_t *) lv_event_get_user_data(e);
+    lv_obj_t *obj = (lv_obj_t *) lv_event_get_user_data(e);
+
+    if (code == LV_EVENT_FOCUSED) {
+        if (lv_indev_get_type(lv_indev_get_act()) != LV_INDEV_TYPE_KEYPAD) {
+            lv_obj_set_parent(kb, lv_obj_get_screen(ta));
+            lv_keyboard_set_textarea(kb, ta);
+            lv_obj_set_style_max_height(kb, LV_VER_RES * 2 / 3, 0);
+            lv_obj_set_height(obj, LV_VER_RES - lv_obj_get_height(kb));
+            lv_obj_clear_flag(kb, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_align(kb, LV_ALIGN_BOTTOM_MID, 0, 0);
+            lv_obj_update_layout(obj);
+            lv_obj_scroll_to_view_recursive(ta, LV_ANIM_OFF);
+        }
+    } else if (code == LV_EVENT_DEFOCUSED) {
+        lv_keyboard_set_textarea(kb, nullptr);
+        lv_obj_set_height(obj, LV_VER_RES);
+        lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
+    } else if (code == LV_EVENT_READY || code == LV_EVENT_CANCEL) {
+        lv_obj_set_height(obj, LV_VER_RES);
+        lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_state(e->target, LV_STATE_FOCUSED);
+        lv_indev_reset(nullptr, e->target);
+    }
+}
+
+static void ta_login_form_event_cb(lv_event_t *e) {
+    lv_event_code_t code = lv_event_get_code(e);
 
     if (code == LV_EVENT_VALUE_CHANGED) {
         if (strlen(lv_textarea_get_text(txt_usuario_login)) >= 8 && strlen(lv_textarea_get_text(txt_password_login))) {
@@ -873,24 +922,6 @@ static void ta_login_form_event_cb(lv_event_t *e) {
         } else {
             lv_obj_add_state(btn_login, LV_STATE_DISABLED);
         }
-    } else if (code == LV_EVENT_FOCUSED) {
-        if (lv_indev_get_type(lv_indev_get_act()) != LV_INDEV_TYPE_KEYPAD) {
-            lv_keyboard_set_textarea(kb, ta);
-            lv_obj_set_style_max_height(kb, LV_VER_RES * 2 / 3, 0);
-            lv_obj_update_layout(pnl_login);
-            lv_obj_set_height(pnl_login, LV_VER_RES - lv_obj_get_height(kb));
-            lv_obj_clear_flag(kb, LV_OBJ_FLAG_HIDDEN);
-            lv_obj_scroll_to_view_recursive(ta, LV_ANIM_OFF);
-        }
-    } else if (code == LV_EVENT_DEFOCUSED) {
-        lv_keyboard_set_textarea(kb, NULL);
-        lv_obj_set_height(pnl_login, LV_VER_RES);
-        lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
-    } else if (code == LV_EVENT_READY || code == LV_EVENT_CANCEL) {
-        lv_obj_set_height(pnl_login, LV_VER_RES);
-        lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_clear_state(e->target, LV_STATE_FOCUSED);
-        lv_indev_reset(NULL, e->target);
     }
 }
 
@@ -904,6 +935,14 @@ static void ta_select_form_event_cb(lv_event_t *e) {
     }
     if (code == LV_EVENT_DELETE) {
         lv_mem_free(lv_event_get_user_data(e));
+    }
+}
+
+static void ta_config_click_event_cb(lv_event_t *e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_CLICKED) {
+        last_scr = (lv_obj_t *) lv_event_get_user_data(e);
+        lv_scr_load(scr_config);
     }
 }
 
@@ -1009,7 +1048,9 @@ void create_scr_splash() {
     lv_obj_set_style_text_align(lbl_version_splash, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
     lv_label_set_text(lbl_version_splash, PUNTO_CONTROL_VERSION);
     lv_obj_align(lbl_version_splash, LV_ALIGN_BOTTOM_LEFT, 10, -10);
-    //lv_obj_add_event_cb(lbl_version_splash, ta_config_click_event_cb, LV_EVENT_CLICKED, scr_splash);
+
+    btn_config_splash = create_config_button(scr_splash);
+    lv_obj_add_flag(btn_config_splash, LV_OBJ_FLAG_HIDDEN);
 }
 
 void create_scr_main() {
@@ -1049,8 +1090,7 @@ void create_scr_main() {
     set_icon_text(lbl_icon_main, "\uF063", LV_PALETTE_BLUE, 1);
 
     // Icono de configuración
-    lv_obj_t *lbl_config_icon_main = lv_label_create(scr_main);
-    set_config_label(lbl_config_icon_main);
+    btn_config_main = create_config_button(scr_main);
 }
 
 void create_scr_check() {
@@ -1079,7 +1119,7 @@ void create_scr_login() {
     lv_obj_set_style_bg_color(scr_login, LV_COLOR_MAKE(255, 255, 255), LV_PART_MAIN);
 
     // Crear teclado
-    lv_obj_t *kb = lv_keyboard_create(scr_login);
+    kb = lv_keyboard_create(scr_login);
     lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
 
     // Crear panel del formulario
@@ -1109,7 +1149,8 @@ void create_scr_login() {
     txt_usuario_login = lv_textarea_create(pnl_login);
     lv_textarea_set_one_line(txt_usuario_login, true);
     lv_textarea_set_placeholder_text(txt_usuario_login, "Personal directivo/administrativo");
-    lv_obj_add_event_cb(txt_usuario_login, ta_login_form_event_cb, LV_EVENT_ALL, kb);
+    lv_obj_add_event_cb(txt_usuario_login, ta_kb_form_event_cb, LV_EVENT_ALL, pnl_login);
+    lv_obj_add_event_cb(txt_usuario_login, ta_login_form_event_cb, LV_EVENT_VALUE_CHANGED, nullptr);
 
     // Campo de contraseña
     lv_obj_t *lbl_password_login = lv_label_create(pnl_login);
@@ -1120,7 +1161,8 @@ void create_scr_login() {
     lv_textarea_set_one_line(txt_password_login, true);
     lv_textarea_set_password_mode(txt_password_login, true);
     lv_textarea_set_placeholder_text(txt_password_login, "No se almacenará");
-    lv_obj_add_event_cb(txt_password_login, ta_login_form_event_cb, LV_EVENT_ALL, kb);
+    lv_obj_add_event_cb(txt_password_login, ta_kb_form_event_cb, LV_EVENT_ALL, pnl_login);
+    lv_obj_add_event_cb(txt_password_login, ta_login_form_event_cb, LV_EVENT_VALUE_CHANGED, nullptr);
 
     // Botón de inicio de sesión
     btn_login = lv_btn_create(pnl_login);
@@ -1167,6 +1209,94 @@ void create_scr_login() {
     // Quitar borde al panel y pegarlo a la parte superior de la pantalla
     lv_obj_set_style_border_width(pnl_login, 0, LV_PART_MAIN);
     lv_obj_align(pnl_login, LV_ALIGN_TOP_MID, 0, 0);
+}
+
+void create_scr_config() {
+    static const char *botones[] = { "" LV_SYMBOL_OK, "" LV_SYMBOL_CLOSE, nullptr };
+    // CREAR PANTALLA DE CONFIGURACIÓN
+    scr_config = lv_obj_create(nullptr);
+    lv_obj_set_style_bg_color(scr_config, LV_COLOR_MAKE(255, 255, 255), LV_PART_MAIN);
+
+    // Ocultar teclado
+    lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
+
+    static lv_style_t style_text_muted;
+    static lv_style_t style_title;
+
+    lv_style_init(&style_title);
+    lv_style_set_text_font(&style_title, &mulish_24);
+
+    lv_style_init(&style_text_muted);
+    lv_style_set_text_opa(&style_text_muted, LV_OPA_50);
+
+    // Crear pestañas
+    lv_obj_t *tabview_config;
+    tabview_config = lv_tabview_create(scr_config, LV_DIR_TOP, 50);
+    lv_obj_t * tab_btns = lv_tabview_get_tab_btns(tabview_config);
+    lv_obj_set_style_pad_right(tab_btns, LV_HOR_RES * 2 / 10 + 3, 0);
+
+    lv_obj_set_height(tabview_config, LV_VER_RES);
+    lv_obj_t *tab_red_config = lv_tabview_add_tab(tabview_config, "Red");
+    lv_obj_t *tab2 = lv_tabview_add_tab(tabview_config, "Pantalla");
+    lv_obj_t *tab3 = lv_tabview_add_tab(tabview_config, "Seguridad");
+
+    // Crear botón de aceptar y cancelar
+    lv_obj_t *btn_matrix_config = lv_btnmatrix_create(scr_config);
+    lv_btnmatrix_set_map(btn_matrix_config, botones);
+    lv_obj_set_width(btn_matrix_config, LV_HOR_RES * 2 / 10);
+    lv_obj_set_height(btn_matrix_config, 50);
+    lv_obj_set_style_pad_all(btn_matrix_config, 3, LV_PART_MAIN);
+    lv_obj_align(btn_matrix_config, LV_ALIGN_TOP_RIGHT, 0, 0);
+
+    // Panel de configuración de red
+    lv_obj_set_style_pad_left(tab_red_config, LV_HOR_RES * 8 / 100, 0);
+    lv_obj_set_style_pad_right(tab_red_config, LV_HOR_RES * 8 / 100, 0);
+
+    lv_obj_t *lbl_red_config = lv_label_create(tab_red_config);
+    lv_label_set_text(lbl_red_config, "Configuración de WiFi");
+    lv_obj_add_style(lbl_red_config, &style_title, LV_PART_MAIN);
+
+    // Campo SSID
+    lv_obj_t *lbl_ssid_config = lv_label_create(tab_red_config);
+    lv_label_set_text(lbl_ssid_config, "Nombre red");
+    lv_obj_add_style(lbl_ssid_config, &style_text_muted, LV_PART_MAIN);
+
+    txt_ssid_config = lv_textarea_create(tab_red_config);
+    lv_textarea_set_one_line(txt_ssid_config, true);
+    lv_textarea_set_placeholder_text(txt_ssid_config, "SSID de la red");
+    lv_obj_add_event_cb(txt_ssid_config, ta_kb_form_event_cb, LV_EVENT_ALL, tabview_config);
+    lv_textarea_set_text(txt_ssid_config, NVS.getString("net.wifi_ssid").c_str());
+
+    // Campo de PSK de la WiFi
+    lv_obj_t *lbl_psk_config = lv_label_create(tab_red_config);
+    lv_label_set_text(lbl_psk_config, "Contraseña");
+    lv_obj_add_style(lbl_psk_config, &style_text_muted, LV_PART_MAIN);
+
+    txt_psk_config = lv_textarea_create(tab_red_config);
+    lv_textarea_set_one_line(txt_psk_config, true);
+    lv_textarea_set_password_mode(txt_psk_config, true);
+    lv_textarea_set_placeholder_text(txt_psk_config, "Mínimo 6 caracteres");
+    lv_obj_add_event_cb(txt_psk_config, ta_kb_form_event_cb, LV_EVENT_ALL, tabview_config);
+    lv_textarea_set_text(txt_psk_config, NVS.getString("net.wifi_psk").c_str());
+
+    // Colocar elementos en una rejilla (5 filas, 2 columnas)
+    static lv_coord_t grid_login_col_dsc[] = {LV_GRID_FR(1), LV_GRID_FR(3), LV_GRID_TEMPLATE_LAST};
+    static lv_coord_t grid_login_row_dsc[] = {
+            LV_GRID_CONTENT,  /* Título */
+            LV_GRID_CONTENT,  /* SSID */
+            LV_GRID_CONTENT,  /* PSK */
+            LV_GRID_TEMPLATE_LAST
+    };
+
+    lv_obj_set_grid_dsc_array(tab_red_config, grid_login_col_dsc, grid_login_row_dsc);
+
+    lv_obj_set_grid_cell(lbl_red_config, LV_GRID_ALIGN_START, 0, 2, LV_GRID_ALIGN_CENTER, 0, 1);
+    lv_obj_set_grid_cell(lbl_ssid_config, LV_GRID_ALIGN_START, 0, 1, LV_GRID_ALIGN_CENTER, 1, 1);
+    lv_obj_set_grid_cell(txt_ssid_config, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_START, 1, 1);
+    lv_obj_set_grid_cell(lbl_psk_config, LV_GRID_ALIGN_START, 0, 1, LV_GRID_ALIGN_CENTER, 2, 1);
+    lv_obj_set_grid_cell(txt_psk_config, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_START, 2, 1);
+
+    lv_obj_scroll_to_view_recursive(txt_ssid_config, LV_ANIM_ON);
 }
 
 void create_scr_selection() {
