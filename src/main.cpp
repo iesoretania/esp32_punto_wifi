@@ -141,6 +141,7 @@ static lv_obj_t *scr_splash;     // Pantalla de inicio (splash screen)
 static lv_obj_t *spinner_splash;
 static lv_obj_t *lbl_ip_splash;
 static lv_obj_t *lbl_estado_splash;
+static lv_obj_t *lbl_version_splash;
 
 static lv_obj_t *scr_main;       // Pantalla principal de lectura de código
 static lv_obj_t *lbl_nombre_main;
@@ -249,6 +250,13 @@ void set_icon_text(lv_obj_t *label, const char *text, lv_palette_t color, int bo
 
 void set_error_login_text(const char *string) {
     lv_label_set_text(lbl_error_login, string);
+}
+
+void set_config_label(lv_obj_t *lbl) {
+    lv_obj_set_style_text_font(lbl, &mulish_32, LV_PART_MAIN);
+    lv_label_set_text(lbl, LV_SYMBOL_SETTINGS);
+    lv_obj_set_style_text_color(lbl, lv_palette_main(LV_PALETTE_INDIGO), LV_PART_MAIN);
+    lv_obj_align(lbl, LV_ALIGN_BOTTOM_LEFT, 10, -10);
 }
 
 String iso_8859_1_to_utf8(String &str) {
@@ -503,6 +511,10 @@ void task_wifi_connection(lv_timer_t *timer) {
                 code = WiFi.hostByName("c0", ip);
             } else {
                 cuenta++;
+                // si a los 10 segundos no nos hemos conectado, cambiar el número de versión por el icono de config.
+                if (cuenta % 100 == 0) {
+                    set_config_label(lbl_version_splash);
+                }
             }
             break;
         case NTP_START:
@@ -992,11 +1004,12 @@ void create_scr_splash() {
     set_ip_splash("Esperando configuración");
 
     // Etiqueta de versión del software en la esquina inferior izquierda
-    lv_obj_t *lbl_version = lv_label_create(scr_splash);
-    lv_obj_set_style_text_font(lbl_version, &mulish_16, LV_PART_MAIN);
-    lv_obj_set_style_text_align(lbl_version, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
-    lv_label_set_text(lbl_version, PUNTO_CONTROL_VERSION);
-    lv_obj_align(lbl_version, LV_ALIGN_BOTTOM_LEFT, 10, -10);
+    lbl_version_splash = lv_label_create(scr_splash);
+    lv_obj_set_style_text_font(lbl_version_splash, &mulish_16, LV_PART_MAIN);
+    lv_obj_set_style_text_align(lbl_version_splash, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
+    lv_label_set_text(lbl_version_splash, PUNTO_CONTROL_VERSION);
+    lv_obj_align(lbl_version_splash, LV_ALIGN_BOTTOM_LEFT, 10, -10);
+    //lv_obj_add_event_cb(lbl_version_splash, ta_config_click_event_cb, LV_EVENT_CLICKED, scr_splash);
 }
 
 void create_scr_main() {
@@ -1034,6 +1047,10 @@ void create_scr_main() {
     lbl_icon_main = lv_label_create(scr_main);
     lv_obj_set_style_text_font(lbl_icon_main, &symbols, LV_PART_MAIN);
     set_icon_text(lbl_icon_main, "\uF063", LV_PALETTE_BLUE, 1);
+
+    // Icono de configuración
+    lv_obj_t *lbl_config_icon_main = lv_label_create(scr_main);
+    set_config_label(lbl_config_icon_main);
 }
 
 void create_scr_check() {
