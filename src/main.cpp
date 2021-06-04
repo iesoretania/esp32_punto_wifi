@@ -16,8 +16,6 @@
 #define SCREEN_WIDTH 480
 #define SCREEN_HEIGHT 320
 
-const char* ssid = "\x41\x6E\x64\x61\x72\x65\x64";
-const char* psk =  "6b629f4c299371737494c61b5a101693a2d4e9e1f3e1320f3ebf9ae379cecf32";
 
 TFT_eSPI tft = TFT_eSPI();
 MFRC522 mfrc522(RFID_SDA_PIN, RFID_RST_PIN);
@@ -753,8 +751,8 @@ void setup() {
     lv_scr_load(scr_splash);
 
     // Inicializar WiFi
-    set_estado_splash_format("Conectando a %s...", ssid);
-    WiFi.begin(ssid, psk);
+    set_estado_splash_format("Conectando a %s...", NVS.getString("net.wifi_ssid").c_str());
+    WiFi.begin(NVS.getString("net.wifi_ssid").c_str(), NVS.getString("net.wifi_psk").c_str());
 
     lv_timer_create(task_wifi_connection, 100, nullptr);
 }
@@ -774,15 +772,18 @@ void initialize_flash() {
     // Botón Boot: si está pulsado durante el inicio, reinicializar flash
     pinMode(0, INPUT);
 
-    if (NVS.getInt("PUNTO_CONTROL") == 1 && digitalRead(0) == HIGH) {
+    if (NVS.getInt("PUNTO_CONTROL") == 3 && digitalRead(0) == HIGH) {
         cookieCPP_authToken = NVS.getString("CPP-authToken");
         cookieCPP_puntToken = NVS.getString("CPP-puntToken");
     } else {
         Serial.println("Borrando flash...");
         NVS.eraseAll(true);
-        NVS.setInt("PUNTO_CONTROL", 1);
+        NVS.setInt("PUNTO_CONTROL", 3);
         NVS.setString("CPP-authToken", "");
         NVS.setString("CPP-puntToken", "");
+        // configuración por defecto de la WiFi
+        NVS.setString("net.wifi_ssid", "\x41\x6E\x64\x61\x72\x65\x64");
+        NVS.setString("net.wifi_psk", "\x36\x62\x36\x32\x39\x66\x34\x63\x32\x39\x39\x33\x37\x31\x37\x33\x37\x34\x39\x34\x63\x36\x31\x62\x35\x61\x31\x30\x31\x36\x39\x33\x61\x32\x64\x34\x65\x39\x65\x31\x66\x33\x65\x31\x33\x32\x30\x66\x33\x65\x62\x66\x39\x61\x65\x33\x37\x39\x63\x65\x63\x66\x33\x32");
     }
 }
 
