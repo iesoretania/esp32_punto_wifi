@@ -646,8 +646,8 @@ void task_main(lv_timer_t *timer) {
     static int cuenta = 0;
     static String uidS;
 
-    // ignorar si no estamos en la pantalla principal
-    if (lv_scr_act() != scr_main) return;
+    // ignorar si no estamos en la pantalla principal o en la de comprobación
+    if (lv_scr_act() != scr_main && lv_scr_act() != scr_check) return;
 
     switch (state) {
         case DONE:
