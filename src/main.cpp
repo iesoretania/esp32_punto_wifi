@@ -190,6 +190,8 @@ void task_main(lv_timer_t *);
 
 static void ta_select_form_event_cb(lv_event_t *e);
 
+void actualizaHora(void);
+
 void set_estado_splash_format(const char *string, const char *p) {
     lv_label_set_text_fmt(lbl_estado_splash, string, p);
     lv_obj_align(lbl_estado_splash, LV_ALIGN_TOP_MID, 0, 15);
@@ -605,26 +607,21 @@ void task_wifi_connection(lv_timer_t *timer) {
 }
 
 void task_main(lv_timer_t *timer) {
-    const char *dia_semana[] = {"Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"};
     static enum {
         DONE, IDLE, CARD_PRESENT, CHECK_ONGOING, CHECK_RESULT_WAIT, NO_NETWORK
     } state = IDLE;
     static int cuenta = 0;
     static String uidS;
 
-    time_t now;
-    char strftime_buf[64];
-    char fecha_final[64];
-    struct tm timeinfo;
-
     switch (state) {
         case DONE:
             lv_timer_del(timer);
             return;
+
         case IDLE:
             cuenta++;
-
             if (WiFi.status() != WL_CONNECTED) {
+                set_icon_text(lbl_icon_main, "\uF252", LV_PALETTE_RED, 1);
                 state = NO_NETWORK;
             } else {
                 if (mfrc522.PICC_IsNewCardPresent()) {
@@ -652,17 +649,7 @@ void task_main(lv_timer_t *timer) {
                     mfrc522.PICC_HaltA();
                 }
 
-                time(&now);
-
-                localtime_r(&now, &timeinfo);
-                strftime(strftime_buf, sizeof(strftime_buf), "%T", &timeinfo);
-                set_hora_main(strftime_buf);
-
-                strftime(strftime_buf, sizeof(strftime_buf), "%d/%m/%G", &timeinfo);
-                strcpy(fecha_final, dia_semana[timeinfo.tm_wday]);
-                strcat(fecha_final, ", ");
-                strcat(fecha_final, strftime_buf);
-                set_fecha_main(fecha_final);
+                actualizaHora();
 
                 switch ((cuenta / 40) % 3) {
                     case 0:
@@ -676,11 +663,13 @@ void task_main(lv_timer_t *timer) {
                 }
             }
             break;
+
         case CARD_PRESENT:
             process_token(uidS);
             cuenta = 0;
             state = CHECK_ONGOING;
             break;
+
         case CHECK_ONGOING:
             if (http_request_status == HTTP_ERROR || (http_request_status == HTTP_DONE && http_status_code != 200)) {
                 cuenta++;
@@ -704,13 +693,42 @@ void task_main(lv_timer_t *timer) {
                 lv_scr_load(scr_main);
             }
             break;
+
         case NO_NETWORK:
-            set_hora_main("NO HAY RED");
+            cuenta++;
+            actualizaHora();
+            set_estado_main("NO HAY RED, ESPERE...");
             if (WiFi.status() == WL_CONNECTED) {
+                set_icon_text(lbl_icon_main, "\uF063", LV_PALETTE_BLUE, 1);
                 state = IDLE;
+            } else {
+                if (cuenta % 20 == 0) {
+                    WiFi.reconnect();
+                }
             }
             break;
     }
+}
+
+void actualizaHora() {
+    const char *dia_semana[] = {"Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"};
+
+    time_t now;
+    char strftime_buf[64];
+    char fecha_final[64];
+    struct tm timeinfo;
+
+    time(&now);
+
+    localtime_r(&now, &timeinfo);
+    strftime(strftime_buf, sizeof(strftime_buf), "%T", &timeinfo);
+    set_hora_main(strftime_buf);
+
+    strftime(strftime_buf, sizeof(strftime_buf), "%d/%m/%G", &timeinfo);
+    strcpy(fecha_final, dia_semana[timeinfo.tm_wday]);
+    strcat(fecha_final, ", ");
+    strcat(fecha_final, strftime_buf);
+    set_fecha_main(fecha_final);
 }
 
 void setup() {
