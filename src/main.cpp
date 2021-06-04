@@ -191,6 +191,8 @@ void create_scr_selection();
 
 void create_scr_calibracion();
 
+void update_scr_config();
+
 void initialize_gui();
 
 void initialize_flash();
@@ -202,7 +204,7 @@ void task_main(lv_timer_t *);
 static void ta_select_form_event_cb(lv_event_t *e);
 static void ta_config_click_event_cb(lv_event_t *e);
 
-void actualizaHora(void);
+void actualiza_hora(void);
 
 void set_estado_splash_format(const char *string, const char *p) {
     lv_label_set_text_fmt(lbl_estado_splash, string, p);
@@ -683,7 +685,7 @@ void task_main(lv_timer_t *timer) {
                     mfrc522.PICC_HaltA();
                 }
 
-                actualizaHora();
+                actualiza_hora();
 
                 switch ((cuenta / 40) % 3) {
                     case 0:
@@ -730,7 +732,7 @@ void task_main(lv_timer_t *timer) {
 
         case NO_NETWORK:
             cuenta++;
-            actualizaHora();
+            actualiza_hora();
             set_estado_main("NO HAY RED, ESPERE...");
             if (WiFi.status() == WL_CONNECTED) {
                 set_icon_text(lbl_icon_main, "\uF063", LV_PALETTE_BLUE, 1);
@@ -744,7 +746,7 @@ void task_main(lv_timer_t *timer) {
     }
 }
 
-void actualizaHora() {
+void actualiza_hora() {
     const char *dia_semana[] = {"Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"};
 
     time_t now;
@@ -835,8 +837,8 @@ void initialize_flash() {
         NVS.setString("CPP-authToken", "");
         NVS.setString("CPP-puntToken", "");
         // configuración por defecto de la WiFi
-        NVS.setString("net.wifi_ssid", "\x41\x6E\x64\x61\x72\x65\x64");
-        NVS.setString("net.wifi_psk", "\x36\x62\x36\x32\x39\x66\x34\x63\x32\x39\x39\x33\x37\x31\x37\x33\x37\x34\x39\x34\x63\x36\x31\x62\x35\x61\x31\x30\x31\x36\x39\x33\x61\x32\x64\x34\x65\x39\x65\x31\x66\x33\x65\x31\x33\x32\x30\x66\x33\x65\x62\x66\x39\x61\x65\x33\x37\x39\x63\x65\x63\x66\x33\x32");
+        NVS.setString("net.wifi_ssid", PUNTO_CONTROL_SSID_PREDETERMINADO);
+        NVS.setString("net.wifi_psk", PUNTO_CONTROL_PSK_PREDETERMINADA);
     }
 }
 
@@ -942,6 +944,7 @@ static void ta_config_click_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
     if (code == LV_EVENT_CLICKED) {
         last_scr = (lv_obj_t *) lv_event_get_user_data(e);
+        update_scr_config();
         lv_scr_load(scr_config);
     }
 }
@@ -996,6 +999,39 @@ static void ta_login_submit_event_cb(lv_event_t *e) {
 
         send_seneca_login_data(datos);
         set_estado_splash("Activando usuario en Séneca");
+    }
+}
+
+static void btn_config_event_cb(lv_event_t *e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    lv_obj_t *obj = lv_event_get_target(e);
+    if (code == LV_EVENT_VALUE_CHANGED) {
+        uint32_t id = lv_btnmatrix_get_selected_btn(obj);
+        if (id == 0) {
+            int reboot = 0;
+            const char *str_ssid = lv_textarea_get_text(txt_ssid_config);
+            const char *str_psk = lv_textarea_get_text(txt_psk_config);
+            if (!NVS.getString("net.wifi_ssid").equals(str_ssid) ||
+                !NVS.getString("net.wifi_psk").equals(str_psk)
+            ) {
+                NVS.setString("net.wifi_ssid", lv_textarea_get_text(txt_ssid_config));
+                NVS.setString("net.wifi_psk", lv_textarea_get_text(txt_psk_config));
+                reboot = 1;
+            }
+            NVS.commit();
+            if (reboot) {
+                esp_restart();
+            }
+        }
+        lv_scr_load(last_scr);
+    }
+}
+
+static void btn_reset_wifi_config_event_cb(lv_event_t *e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_CLICKED) {
+        lv_textarea_set_text(txt_ssid_config, PUNTO_CONTROL_SSID_PREDETERMINADO);
+        lv_textarea_set_text(txt_psk_config, PUNTO_CONTROL_PSK_PREDETERMINADA);
     }
 }
 
@@ -1247,6 +1283,7 @@ void create_scr_config() {
     lv_obj_set_height(btn_matrix_config, 50);
     lv_obj_set_style_pad_all(btn_matrix_config, 3, LV_PART_MAIN);
     lv_obj_align(btn_matrix_config, LV_ALIGN_TOP_RIGHT, 0, 0);
+    lv_obj_add_event_cb(btn_matrix_config, btn_config_event_cb, LV_EVENT_VALUE_CHANGED, nullptr);
 
     // Panel de configuración de red
     lv_obj_set_style_pad_left(tab_red_config, LV_HOR_RES * 8 / 100, 0);
@@ -1265,7 +1302,6 @@ void create_scr_config() {
     lv_textarea_set_one_line(txt_ssid_config, true);
     lv_textarea_set_placeholder_text(txt_ssid_config, "SSID de la red");
     lv_obj_add_event_cb(txt_ssid_config, ta_kb_form_event_cb, LV_EVENT_ALL, tabview_config);
-    lv_textarea_set_text(txt_ssid_config, NVS.getString("net.wifi_ssid").c_str());
 
     // Campo de PSK de la WiFi
     lv_obj_t *lbl_psk_config = lv_label_create(tab_red_config);
@@ -1277,24 +1313,34 @@ void create_scr_config() {
     lv_textarea_set_password_mode(txt_psk_config, true);
     lv_textarea_set_placeholder_text(txt_psk_config, "Mínimo 6 caracteres");
     lv_obj_add_event_cb(txt_psk_config, ta_kb_form_event_cb, LV_EVENT_ALL, tabview_config);
-    lv_textarea_set_text(txt_psk_config, NVS.getString("net.wifi_psk").c_str());
 
-    // Colocar elementos en una rejilla (5 filas, 2 columnas)
+    // Botón restaurar configuración
+    lv_obj_t *btn_wifi_reset_config = lv_btn_create(tab_red_config);
+    lv_obj_set_height(btn_wifi_reset_config, LV_SIZE_CONTENT);
+    lv_obj_add_event_cb(btn_wifi_reset_config, btn_reset_wifi_config_event_cb, LV_EVENT_CLICKED, nullptr);
+
+    lv_obj_t *lbl_reset_wifi = lv_label_create(btn_wifi_reset_config);
+    lv_label_set_text(lbl_reset_wifi, "Restaurar conexión " PUNTO_CONTROL_SSID_PREDETERMINADO);
+    lv_obj_align(lbl_reset_wifi, LV_ALIGN_TOP_MID, 0, 0);
+
+    // Colocar elementos en una rejilla (7 filas, 2 columnas)
     static lv_coord_t grid_login_col_dsc[] = {LV_GRID_FR(1), LV_GRID_FR(3), LV_GRID_TEMPLATE_LAST};
     static lv_coord_t grid_login_row_dsc[] = {
             LV_GRID_CONTENT,  /* Título */
             LV_GRID_CONTENT,  /* SSID */
             LV_GRID_CONTENT,  /* PSK */
+            LV_GRID_CONTENT,  /* Restaurar, botón */
             LV_GRID_TEMPLATE_LAST
     };
 
     lv_obj_set_grid_dsc_array(tab_red_config, grid_login_col_dsc, grid_login_row_dsc);
 
     lv_obj_set_grid_cell(lbl_red_config, LV_GRID_ALIGN_START, 0, 2, LV_GRID_ALIGN_CENTER, 0, 1);
-    lv_obj_set_grid_cell(lbl_ssid_config, LV_GRID_ALIGN_START, 0, 1, LV_GRID_ALIGN_CENTER, 1, 1);
+    lv_obj_set_grid_cell(lbl_ssid_config, LV_GRID_ALIGN_END, 0, 1, LV_GRID_ALIGN_CENTER, 1, 1);
     lv_obj_set_grid_cell(txt_ssid_config, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_START, 1, 1);
-    lv_obj_set_grid_cell(lbl_psk_config, LV_GRID_ALIGN_START, 0, 1, LV_GRID_ALIGN_CENTER, 2, 1);
+    lv_obj_set_grid_cell(lbl_psk_config, LV_GRID_ALIGN_END, 0, 1, LV_GRID_ALIGN_CENTER, 2, 1);
     lv_obj_set_grid_cell(txt_psk_config, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_START, 2, 1);
+    lv_obj_set_grid_cell(btn_wifi_reset_config, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 3, 1);
 
     lv_obj_scroll_to_view_recursive(txt_ssid_config, LV_ANIM_ON);
 }
@@ -1332,6 +1378,11 @@ void create_scr_selection() {
     // Quitar borde al panel y pegarlo a la parte superior de la pantalla
     lv_obj_set_style_border_width(pnl_selection, 0, LV_PART_MAIN);
     lv_obj_align(pnl_selection, LV_ALIGN_TOP_MID, 0, 0);
+}
+
+void update_scr_config() {
+    lv_textarea_set_text(txt_ssid_config, NVS.getString("net.wifi_ssid").c_str());
+    lv_textarea_set_text(txt_psk_config, NVS.getString("net.wifi_psk").c_str());
 }
 
 void loop() {
