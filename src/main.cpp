@@ -350,8 +350,6 @@ int send_seneca_data(String &body) {
         http_cookie += cookieJSESSIONID;
     }
 
-    //Serial.println("Cookies enviadas: " + http_cookie);
-
     // añadir cabeceras
     esp_http_client_set_header(http_client, "Cookie", http_cookie.c_str());
 
@@ -545,6 +543,8 @@ void task_wifi_connection(lv_timer_t *timer) {
 
     static String empty_body = "";
 
+    String uidS;
+
     switch (state) {
         case INIT:
             if (NVS.getString("sec.code").isEmpty()) {
@@ -705,8 +705,14 @@ void task_wifi_connection(lv_timer_t *timer) {
             }
             break;
         case CONFIG_CODE_1:
-            if (keypad_done) {
+            // ver si hay algún llavero
+            uidS = read_id();
+            if (keypad_done || !uidS.isEmpty()) {
                 keypad_done = 0;
+                // si se ha leído un llavero, simular la introducción del código
+                if (!uidS.isEmpty()) {
+                    read_code = uidS;
+                }
                 if (!read_code.isEmpty()) {
                     response = read_code;
                     keypad_request("Confirme código");
@@ -715,8 +721,14 @@ void task_wifi_connection(lv_timer_t *timer) {
             }
             break;
         case CONFIG_CODE_2:
-            if (keypad_done) {
+            // ver si hay algún llavero
+            uidS = read_id();
+            if (keypad_done|| !uidS.isEmpty()) {
                 keypad_done = 0;
+                // si se ha leído un llavero, simular la introducción del código
+                if (!uidS.isEmpty()) {
+                    read_code = uidS;
+                }
                 if (!read_code.isEmpty()) {
                     if (response.equals(read_code)) {
                         NVS.setString("sec.code", read_code, true);
@@ -849,7 +861,11 @@ void task_main(lv_timer_t *timer) {
             }
             break;
         case CONFIG_SCREEN_LOCK:
-            if (keypad_done == 1) {
+            uidS = read_id();
+            if (keypad_done == 1 || !uidS.isEmpty()) {
+                if (!uidS.isEmpty()) {
+                    read_code = uidS;
+                }
                 if (read_code.isEmpty()) {
                     keypad_done = 0;
                     configuring = 0;
@@ -1321,6 +1337,7 @@ void create_scr_splash() {
     // Etiqueta de estado actual centrada en la parte superior
     lbl_estado_splash = lv_label_create(scr_splash);
     lv_obj_set_style_text_font(lbl_estado_splash, &mulish_24, LV_PART_MAIN);
+    lv_obj_set_style_text_color(lbl_estado_splash, lv_palette_main(LV_PALETTE_BLUE_GREY), LV_PART_MAIN);
     lv_obj_set_style_text_align(lbl_estado_splash, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
     set_estado_splash("Inicializando...");
 
