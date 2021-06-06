@@ -107,8 +107,8 @@ esp_err_t http_event_handle(esp_http_client_event_t *evt) {
 
 /* Flushing en el display */
 void espi_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p) {
-    uint32_t w = (area->x2 - area->x1 + 1);
-    uint32_t h = (area->y2 - area->y1 + 1);
+    int32_t w = (area->x2 - area->x1 + 1);
+    int32_t h = (area->y2 - area->y1 + 1);
 
     tft.startWrite();
     tft.setAddrWindow(area->x1, area->y1, w, h);
@@ -151,7 +151,6 @@ static lv_obj_t *lbl_hora_main;
 static lv_obj_t *lbl_fecha_main;
 static lv_obj_t *lbl_estado_main;
 static lv_obj_t *lbl_icon_main;
-static lv_obj_t *btn_config_main;
 
 static lv_obj_t *scr_check;      // Pantalla de comprobación
 static lv_obj_t *lbl_estado_check;
@@ -173,14 +172,13 @@ static lv_obj_t *scr_calibracion;// Pantalla de calibración de panel táctil
 static lv_obj_t *scr_config;     // Pantalla de configuración
 static lv_obj_t *txt_ssid_config;
 static lv_obj_t *txt_psk_config;
+static lv_obj_t *sld_brillo_config;
 
 static lv_obj_t *scr_codigo;     // Pantalla de introducción de código manual
 static lv_obj_t *lbl_estado_codigo;
 static lv_obj_t *txt_codigo;
 
 static lv_obj_t *kb;             // Teclado en pantalla
-
-static lv_obj_t *last_scr;
 
 static int configuring;
 
@@ -227,6 +225,8 @@ void config_request();
 void config_lock_request();
 
 void keypad_request(const char *mensaje);
+
+void setBrightness(uint64_t brillo);
 
 void set_estado_splash_format(const char *string, const char *p) {
     lv_label_set_text_fmt(lbl_estado_splash, string, p);
@@ -939,7 +939,7 @@ void actualiza_hora() {
     time_t now;
     char strftime_buf[64];
     char fecha_final[64];
-    struct tm timeinfo;
+    struct tm timeinfo {};
 
     time(&now);
 
@@ -964,7 +964,6 @@ void setup() {
     pinMode(BACKLIGHT_PIN, OUTPUT);
     ledcAttachPin(BACKLIGHT_PIN, 1);
     ledcSetup(1, 5000, 8);
-    ledcWrite(1, 255);
 
     // Inicializar flash
     initialize_flash();
@@ -1032,6 +1031,10 @@ void initialize_flash() {
 }
 
 void initialize_gui() {
+    // recuperar brillo de pantalla
+    setBrightness(NVS.getInt("scr.brightness"));
+
+    // inicializar LVGL
     lv_init();
 
     // Inicializar buffers del GUI
@@ -1074,6 +1077,14 @@ void initialize_gui() {
     }
 
     tft.setTouch(calData);
+}
+
+void setBrightness(uint64_t brillo) {
+    if (brillo == 0) brillo = PUNTO_CONTROL_BRILLO_PREDETERMINADO; // brillo por defecto
+    if (brillo < 32) brillo = 32;
+    if (brillo > 255) brillo = 255;
+
+    ledcWrite(1, brillo);
 }
 
 static void ta_kb_form_event_cb(lv_event_t *e) {
@@ -1234,10 +1245,14 @@ static void btn_config_event_cb(lv_event_t *e) {
                 NVS.setString("net.wifi_psk", lv_textarea_get_text(txt_psk_config));
                 reboot = 1;
             }
+            NVS.setInt("scr.brightness", lv_slider_get_value(sld_brillo_config));
             NVS.commit();
             if (reboot) {
                 esp_restart();
             }
+        } else {
+            // deshacer cambios
+            setBrightness(NVS.getInt("scr.brightness"));
         }
         configuring = 0;
     }
@@ -1248,6 +1263,22 @@ static void btn_reset_wifi_config_event_cb(lv_event_t *e) {
     if (code == LV_EVENT_CLICKED) {
         lv_textarea_set_text(txt_ssid_config, PUNTO_CONTROL_SSID_PREDETERMINADO);
         lv_textarea_set_text(txt_psk_config, PUNTO_CONTROL_PSK_PREDETERMINADA);
+    }
+}
+
+static void btn_recalibrate_event_cb(lv_event_t *e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_CLICKED) {
+        NVS.erase("CalData", true);
+        esp_restart();
+    }
+}
+
+static void sld_brightness_event_cb(lv_event_t *e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_VALUE_CHANGED) {
+        lv_obj_t *slider = lv_event_get_target(e);
+        setBrightness(lv_slider_get_value(slider));
     }
 }
 
@@ -1396,7 +1427,7 @@ void create_scr_main() {
     set_icon_text(lbl_icon_main, "\uF063", LV_PALETTE_BLUE, 1);
 
     // Icono de configuración
-    btn_config_main = create_config_button(scr_main);
+    lv_obj_t *btn_config_main = create_config_button(scr_main);
 
     // Icono de teclado
     lv_obj_t *btn_keypad_main = lv_btn_create(scr_main);
@@ -1554,8 +1585,8 @@ void create_scr_config() {
 
     lv_obj_set_height(tabview_config, LV_VER_RES);
     lv_obj_t *tab_red_config = lv_tabview_add_tab(tabview_config, "Red");
-    lv_obj_t *tab2 = lv_tabview_add_tab(tabview_config, "Pantalla");
-    lv_obj_t *tab3 = lv_tabview_add_tab(tabview_config, "Seguridad");
+    lv_obj_t *tab_pantalla_config = lv_tabview_add_tab(tabview_config, "Pantalla");
+    lv_obj_t *tab_red_seguridad = lv_tabview_add_tab(tabview_config, "Seguridad");
 
     // Crear botón de aceptar y cancelar
     lv_obj_t *btn_matrix_config = lv_btnmatrix_create(scr_config);
@@ -1566,7 +1597,7 @@ void create_scr_config() {
     lv_obj_align(btn_matrix_config, LV_ALIGN_TOP_RIGHT, 0, 0);
     lv_obj_add_event_cb(btn_matrix_config, btn_config_event_cb, LV_EVENT_ALL, nullptr);
 
-    // Panel de configuración de red
+    // PANEL DE CONFIGURACIÓN DE RED
     lv_obj_set_style_pad_left(tab_red_config, LV_HOR_RES * 8 / 100, 0);
     lv_obj_set_style_pad_right(tab_red_config, LV_HOR_RES * 8 / 100, 0);
 
@@ -1604,9 +1635,9 @@ void create_scr_config() {
     lv_label_set_text(lbl_reset_wifi, "Restaurar conexión " PUNTO_CONTROL_SSID_PREDETERMINADO);
     lv_obj_align(lbl_reset_wifi, LV_ALIGN_TOP_MID, 0, 0);
 
-    // Colocar elementos en una rejilla (7 filas, 2 columnas)
-    static lv_coord_t grid_login_col_dsc[] = {LV_GRID_FR(1), LV_GRID_FR(3), LV_GRID_TEMPLATE_LAST};
-    static lv_coord_t grid_login_row_dsc[] = {
+    // Colocar elementos en una rejilla (4 filas, 2 columnas)
+    static lv_coord_t grid_col_dsc[] = {LV_GRID_FR(1), LV_GRID_FR(3), LV_GRID_TEMPLATE_LAST};
+    static lv_coord_t grid_red_row_dsc[] = {
             LV_GRID_CONTENT,  /* Título */
             LV_GRID_CONTENT,  /* SSID */
             LV_GRID_CONTENT,  /* PSK */
@@ -1614,7 +1645,7 @@ void create_scr_config() {
             LV_GRID_TEMPLATE_LAST
     };
 
-    lv_obj_set_grid_dsc_array(tab_red_config, grid_login_col_dsc, grid_login_row_dsc);
+    lv_obj_set_grid_dsc_array(tab_red_config, grid_col_dsc, grid_red_row_dsc);
 
     lv_obj_set_grid_cell(lbl_red_config, LV_GRID_ALIGN_START, 0, 2, LV_GRID_ALIGN_CENTER, 0, 1);
     lv_obj_set_grid_cell(lbl_ssid_config, LV_GRID_ALIGN_END, 0, 1, LV_GRID_ALIGN_CENTER, 1, 1);
@@ -1622,6 +1653,50 @@ void create_scr_config() {
     lv_obj_set_grid_cell(lbl_psk_config, LV_GRID_ALIGN_END, 0, 1, LV_GRID_ALIGN_CENTER, 2, 1);
     lv_obj_set_grid_cell(txt_psk_config, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_START, 2, 1);
     lv_obj_set_grid_cell(btn_wifi_reset_config, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 3, 1);
+
+    // PANEL DE CONFIGURACIÓN DE PANTALLA
+    lv_obj_set_style_pad_left(tab_pantalla_config, LV_HOR_RES * 8 / 100, 0);
+    lv_obj_set_style_pad_right(tab_pantalla_config, LV_HOR_RES * 8 / 100, 0);
+
+    lv_obj_t *lbl_pantalla_config = lv_label_create(tab_pantalla_config);
+    lv_label_set_text(lbl_pantalla_config, "Configuración de la pantalla");
+    lv_obj_add_style(lbl_pantalla_config, &style_title, LV_PART_MAIN);
+
+    // Brillo
+    lv_obj_t *lbl_brillo_config = lv_label_create(tab_pantalla_config);
+    lv_label_set_text(lbl_brillo_config, "Brillo");
+    lv_obj_add_style(lbl_brillo_config, &style_text_muted, LV_PART_MAIN);
+
+    sld_brillo_config = lv_slider_create(tab_pantalla_config);
+    lv_slider_set_range(sld_brillo_config, 32, 255);
+    lv_slider_set_value(sld_brillo_config, 255, LV_ANIM_OFF);
+    lv_obj_add_event_cb(sld_brillo_config, sld_brightness_event_cb, LV_EVENT_VALUE_CHANGED, nullptr);
+
+    // Botón para volver a calibrar
+    lv_obj_t *btn_calibrar_config = lv_btn_create(tab_pantalla_config);
+    lv_obj_set_height(btn_calibrar_config, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_color(btn_calibrar_config, lv_palette_main(LV_PALETTE_RED), LV_PART_MAIN);
+    lv_obj_add_event_cb(btn_calibrar_config, btn_recalibrate_event_cb, LV_EVENT_CLICKED, nullptr);
+    lv_obj_t *lbl_calibrar_config = lv_label_create(btn_calibrar_config);
+    lv_label_set_text(lbl_calibrar_config, "Recalibrar panel táctil");
+    lv_obj_align(lbl_calibrar_config, LV_ALIGN_TOP_MID, 0, 0);
+
+    // Colocar elementos en una rejilla (5 filas, 2 columnas)
+    static lv_coord_t grid_pantalla_row_dsc[] = {
+            LV_GRID_CONTENT,  /* Título */
+            5,                /* Separador */
+            LV_GRID_CONTENT,  /* Barra de brillo */
+            5,                /* Separador */
+            LV_GRID_CONTENT,  /* Recalibrar, botón */
+            LV_GRID_TEMPLATE_LAST
+    };
+
+    lv_obj_set_grid_dsc_array(tab_pantalla_config, grid_col_dsc, grid_pantalla_row_dsc);
+
+    lv_obj_set_grid_cell(lbl_pantalla_config, LV_GRID_ALIGN_START, 0, 2, LV_GRID_ALIGN_CENTER, 0, 1);
+    lv_obj_set_grid_cell(lbl_brillo_config, LV_GRID_ALIGN_END, 0, 1, LV_GRID_ALIGN_CENTER, 2, 1);
+    lv_obj_set_grid_cell(sld_brillo_config, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_START, 2, 1);
+    lv_obj_set_grid_cell(btn_calibrar_config, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 4, 1);
 
     lv_obj_scroll_to_view_recursive(txt_ssid_config, LV_ANIM_ON);
 }
@@ -1708,6 +1783,9 @@ void create_scr_codigo() {
 void update_scr_config() {
     lv_textarea_set_text(txt_ssid_config, NVS.getString("net.wifi_ssid").c_str());
     lv_textarea_set_text(txt_psk_config, NVS.getString("net.wifi_psk").c_str());
+    uint64_t brillo = NVS.getInt("scr.brightness");
+    if (brillo == 0) brillo = PUNTO_CONTROL_BRILLO_PREDETERMINADO;
+    lv_slider_set_value(sld_brillo_config, brillo, LV_ANIM_OFF);
 }
 
 void loop() {
