@@ -173,6 +173,7 @@ static lv_obj_t *scr_config;     // Pantalla de configuración
 static lv_obj_t *txt_ssid_config;
 static lv_obj_t *txt_psk_config;
 static lv_obj_t *sld_brillo_config;
+static lv_obj_t *sw_forzar_activacion_config;
 
 static lv_obj_t *scr_codigo;     // Pantalla de introducción de código manual
 static lv_obj_t *lbl_estado_codigo;
@@ -534,7 +535,7 @@ void process_seneca_response() {
 void task_wifi_connection(lv_timer_t *timer) {
     static enum {
         INIT, CONNECTING, NTP_START, NTP_WAIT, CHECKING, CHECK_WAIT, CHECK_RETRY, LOGIN_SCREEN, WAITING,
-        CONFIG_SCREEN_LOCK, CONFIG_SCREEN, CONFIG_CODE_1, CONFIG_CODE_2, DONE
+        CONFIG_SCREEN_LOCK, CONFIG_SCREEN, CONFIG_CODE_1, CONFIG_CODE_2, CODE_WAIT, DONE
     } state = INIT;
 
     static int cuenta = 0;
@@ -546,17 +547,23 @@ void task_wifi_connection(lv_timer_t *timer) {
     String uidS;
 
     switch (state) {
+        case DONE:
+            lv_timer_del(timer);
+            return;
         case INIT:
             if (NVS.getString("sec.code").isEmpty()) {
                 state = CONFIG_CODE_1;
                 keypad_request("Creación del código de administración");
+                break;
             } else {
+                if (NVS.getInt("sec.force_code")) {
+                    state = CODE_WAIT;
+                    keypad_request("Active el punto con el código de administración");
+                    break;
+                }
                 state = CONNECTING;
+                lv_scr_load(scr_splash);
             }
-            break;
-        case DONE:
-            lv_timer_del(timer);
-            return;
         case CONNECTING:
             lv_obj_clear_flag(spinner_splash, LV_OBJ_FLAG_HIDDEN);
             if (configuring) {
@@ -742,6 +749,26 @@ void task_wifi_connection(lv_timer_t *timer) {
                 }
             }
             break;
+        case CODE_WAIT:
+            // ver si hay algún llavero
+            uidS = read_id();
+            if (keypad_done || !uidS.isEmpty()) {
+                keypad_done = 0;
+                // si se ha leído un llavero, simular la introducción del código
+                if (!uidS.isEmpty()) {
+                    read_code = uidS;
+                }
+                if (read_code.equals(NVS.getString("sec.code"))) {
+                    state = CONNECTING;
+                    read_code = "";
+                    lv_scr_load(scr_splash);
+                    break;
+                }
+                keypad_request("Código incorrecto");
+                keypad_done = 0;
+                lv_textarea_set_text(txt_codigo, "");
+            }
+            break;
     }
 }
 
@@ -803,15 +830,13 @@ void task_main(lv_timer_t *timer) {
 
                 actualiza_hora();
 
-                switch ((cuenta / 40) % 3) {
+                switch ((cuenta / 40) % 2) {
                     case 0:
                         set_estado_main("Acerque llavero...");
                         break;
                     case 1:
                         set_estado_main("Pulse pantalla para PIN");
                         break;
-                    case 2:
-                        set_estado_main("CÓDIGO QR IRÁ AQUÍ");
                 }
             }
             break;
@@ -991,12 +1016,12 @@ void setup() {
     create_scr_selection();
     create_scr_config();
     create_scr_codigo();
-    lv_scr_load(scr_splash);
 
     // Inicializar WiFi
     set_estado_splash_format("Conectando a %s...", NVS.getString("net.wifi_ssid").c_str());
     WiFi.begin(NVS.getString("net.wifi_ssid").c_str(), NVS.getString("net.wifi_psk").c_str());
 
+    // Comenzar la conexión a la red
     lv_timer_create(task_wifi_connection, 100, nullptr);
 }
 
@@ -1246,6 +1271,7 @@ static void btn_config_event_cb(lv_event_t *e) {
                 reboot = 1;
             }
             NVS.setInt("scr.brightness", lv_slider_get_value(sld_brillo_config));
+            NVS.setInt("sec.force_code", lv_obj_has_state(sw_forzar_activacion_config, LV_STATE_CHECKED));
             NVS.commit();
             if (reboot) {
                 esp_restart();
@@ -1286,6 +1312,14 @@ static void btn_punto_control_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
     if (code == LV_EVENT_CLICKED) {
         NVS.erase("CPP-puntToken", true);
+        esp_restart();
+    }
+}
+
+static void btn_cambio_codigo_event_cb(lv_event_t *e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_CLICKED) {
+        NVS.erase("sec.code", true);
         esp_restart();
     }
 }
@@ -1386,7 +1420,6 @@ void create_scr_splash() {
     // Etiqueta de estado actual centrada en la parte superior
     lbl_estado_splash = lv_label_create(scr_splash);
     lv_obj_set_style_text_font(lbl_estado_splash, &mulish_24, LV_PART_MAIN);
-    lv_obj_set_style_text_color(lbl_estado_splash, lv_palette_main(LV_PALETTE_INDIGO), LV_PART_MAIN);
     lv_obj_set_style_text_align(lbl_estado_splash, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
     set_estado_splash("Inicializando...");
 
@@ -1445,7 +1478,7 @@ void create_scr_main() {
     set_icon_text(lbl_icon_main, "\uF063", LV_PALETTE_BLUE, 1);
 
     // Icono de configuración
-    lv_obj_t *btn_config_main = create_config_button(scr_main);
+    create_config_button(scr_main);
 
     // Icono de teclado
     lv_obj_t *btn_keypad_main = lv_btn_create(scr_main);
@@ -1602,9 +1635,10 @@ void create_scr_config() {
     lv_obj_set_style_pad_right(tab_btns, LV_HOR_RES * 2 / 10 + 3, 0);
 
     lv_obj_set_height(tabview_config, LV_VER_RES);
+    lv_obj_set_style_anim_time(tabview_config, 0, LV_PART_MAIN);
     lv_obj_t *tab_red_config = lv_tabview_add_tab(tabview_config, "Red");
     lv_obj_t *tab_pantalla_config = lv_tabview_add_tab(tabview_config, "Pantalla");
-    lv_obj_t *tab_seguridad_config = lv_tabview_add_tab(tabview_config, "Seguridad");
+    lv_obj_t *tab_seguridad_config = lv_tabview_add_tab(tabview_config, "Acceso");
 
     static lv_style_t style_bg;
     lv_style_init(&style_bg);
@@ -1737,8 +1771,21 @@ void create_scr_config() {
     lv_obj_set_style_pad_right(tab_seguridad_config, LV_HOR_RES * 8 / 100, 0);
 
     lv_obj_t *lbl_seguridad_config = lv_label_create(tab_seguridad_config);
-    lv_label_set_text(lbl_seguridad_config, "Parámetros de seguridad");
+    lv_label_set_text(lbl_seguridad_config, "Parámetros de acceso");
     lv_obj_add_style(lbl_seguridad_config, &style_title, LV_PART_MAIN);
+
+    // Switch de forzar activación
+    sw_forzar_activacion_config = lv_switch_create(tab_seguridad_config);
+    lv_obj_t *lbl_forzar_activacion_config = lv_label_create(tab_seguridad_config);
+    lv_label_set_text(lbl_forzar_activacion_config, "Activar sólo con codigo");
+
+    // Botón para cambiar código de administración
+    lv_obj_t *btn_cambio_codigo_config = lv_btn_create(tab_seguridad_config);
+    lv_obj_set_height(btn_cambio_codigo_config, LV_SIZE_CONTENT);
+    lv_obj_add_event_cb(btn_cambio_codigo_config, btn_cambio_codigo_event_cb, LV_EVENT_CLICKED, nullptr);
+    lv_obj_t *lbl_cambio_codigo_config = lv_label_create(btn_cambio_codigo_config);
+    lv_label_set_text(lbl_cambio_codigo_config, "Cambiar código de administración");
+    lv_obj_align(lbl_cambio_codigo_config, LV_ALIGN_TOP_MID, 0, 0);
 
     // Botón para cambiar de punto de acceso
     lv_obj_t *btn_punto_acceso_config = lv_btn_create(tab_seguridad_config);
@@ -1758,23 +1805,24 @@ void create_scr_config() {
     lv_label_set_text(lbl_logout_config, "Cerrar sesión");
     lv_obj_align(lbl_logout_config, LV_ALIGN_TOP_MID, 0, 0);
 
-    // Colocar elementos en una rejilla (7 filas, 2 columnas)
+    // Colocar elementos en una rejilla (5 filas, 2 columnas)
     static lv_coord_t grid_seguridad_row_dsc[] = {
             LV_GRID_CONTENT,  /* Título */
-            5,                /* Separador */
             LV_GRID_CONTENT,  /* Forzar activación */
-            5,                /* Separador */
-            LV_GRID_CONTENT,  /* Cambiar punto de acceso */
-            5,                /* Separador */
-            LV_GRID_CONTENT,  /* Cerrar sesión */
+            LV_GRID_CONTENT,  /* Cambiar código de administración, botón */
+            LV_GRID_CONTENT,  /* Cambiar punto de acceso, botón */
+            LV_GRID_CONTENT,  /* Cerrar sesión, botón */
             LV_GRID_TEMPLATE_LAST
     };
 
     lv_obj_set_grid_dsc_array(tab_seguridad_config, grid_col_dsc, grid_seguridad_row_dsc);
 
     lv_obj_set_grid_cell(lbl_seguridad_config, LV_GRID_ALIGN_START, 0, 2, LV_GRID_ALIGN_CENTER, 0, 1);
-    lv_obj_set_grid_cell(btn_punto_acceso_config, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 4, 1);
-    lv_obj_set_grid_cell(btn_logout_config, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 6, 1);
+    lv_obj_set_grid_cell(sw_forzar_activacion_config, LV_GRID_ALIGN_END, 0, 1, LV_GRID_ALIGN_CENTER, 1, 1);
+    lv_obj_set_grid_cell(lbl_forzar_activacion_config, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_CENTER, 1, 1);
+    lv_obj_set_grid_cell(btn_cambio_codigo_config, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 2, 1);
+    lv_obj_set_grid_cell(btn_punto_acceso_config, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 3, 1);
+    lv_obj_set_grid_cell(btn_logout_config, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 4, 1);
 }
 
 void create_scr_selection() {
@@ -1859,9 +1907,20 @@ void create_scr_codigo() {
 void update_scr_config() {
     lv_textarea_set_text(txt_ssid_config, NVS.getString("net.wifi_ssid").c_str());
     lv_textarea_set_text(txt_psk_config, NVS.getString("net.wifi_psk").c_str());
+
+    // Brillo de la pantalla
     uint64_t brillo = NVS.getInt("scr.brightness");
     if (brillo == 0) brillo = PUNTO_CONTROL_BRILLO_PREDETERMINADO;
     lv_slider_set_value(sld_brillo_config, brillo, LV_ANIM_OFF);
+
+    // Forzar activación con código
+    uint64_t force = NVS.getInt("sec.force_code");
+    if (force) {
+        lv_obj_add_state(sw_forzar_activacion_config, LV_STATE_CHECKED);
+    } else {
+        lv_obj_clear_state(sw_forzar_activacion_config, LV_STATE_CHECKED);
+    }
+
     // Comenzar en la primera página
     lv_obj_scroll_to_view_recursive(txt_ssid_config, LV_ANIM_OFF);
 }
