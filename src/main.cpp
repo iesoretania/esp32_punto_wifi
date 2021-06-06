@@ -39,7 +39,9 @@ String cookieCPP_puntToken;
 String cookieJSESSIONID;
 String cookieSenecaP;
 
-typedef enum { HTTP_IDLE, HTTP_ERROR, HTTP_ONGOING, HTTP_DONE } HttpRequestStatus;
+typedef enum {
+    HTTP_IDLE, HTTP_ERROR, HTTP_ONGOING, HTTP_DONE
+} HttpRequestStatus;
 
 HttpRequestStatus http_request_status;
 int http_status_code;
@@ -215,6 +217,7 @@ void initialize_http_client();
 void task_main(lv_timer_t *);
 
 static void ta_select_form_event_cb(lv_event_t *e);
+
 static void ta_config_click_event_cb(lv_event_t *e);
 
 String read_id();
@@ -335,7 +338,7 @@ int send_seneca_data(String &body) {
             http_cookie += "; ";
         }
         primero = 0;
-        http_cookie +=  cookieCPP_puntToken;
+        http_cookie += cookieCPP_puntToken;
     }
     if (!cookieSenecaP.isEmpty()) {
         if (!primero) {
@@ -447,10 +450,12 @@ void xml_html_callback(uint8_t statusflags, char *tagName, uint16_t tagNameLen, 
     if ((statusflags & STATUS_START_TAG) && strstr(tagName, "h1")) {
         xmlStatus = 2;
     }
-    if ((statusflags & STATUS_START_TAG) && strlen(tagName) > 2 && tagName[tagNameLen - 1] =='a' && tagName[tagNameLen - 2]  == '/') {
+    if ((statusflags & STATUS_START_TAG) && strlen(tagName) > 2 && tagName[tagNameLen - 1] == 'a' &&
+        tagName[tagNameLen - 2] == '/') {
         xmlStatus = 3;
     }
-    if ((statusflags & STATUS_END_TAG) && strlen(tagName) > 2 && tagName[tagNameLen - 1] =='a' && tagName[tagNameLen - 2]  == '/') {
+    if ((statusflags & STATUS_END_TAG) && strlen(tagName) > 2 && tagName[tagNameLen - 1] == 'a' &&
+        tagName[tagNameLen - 2] == '/') {
         xmlStatus = 0;
     }
 
@@ -476,7 +481,8 @@ void xml_html_callback(uint8_t statusflags, char *tagName, uint16_t tagNameLen, 
     }
 
     // si estamos dentro de una etiqueta <a>, comprobar si es una lista de puntos de control
-    if (xmlStatus == 3 && statusflags & STATUS_ATTR_TEXT && !strcasecmp(tagName, "href") && strstr(data, "activarPuntoAcceso")) {
+    if (xmlStatus == 3 && statusflags & STATUS_ATTR_TEXT && !strcasecmp(tagName, "href") &&
+        strstr(data, "activarPuntoAcceso")) {
         nuevo_punto = data;
         nuevo_punto = nuevo_punto.substring(31, nuevo_punto.indexOf(')') - 1);
     }
@@ -507,7 +513,11 @@ void process_token(String uid) {
 }
 
 void process_seneca_response() {
-    modo = ""; punto = ""; xCentro = ""; nombre_punto = ""; tipo_acceso = "";
+    modo = "";
+    punto = "";
+    xCentro = "";
+    nombre_punto = "";
+    tipo_acceso = "";
 
     // análisis XML del HTML devuelto para extraer los valores de los campos ocultos
     xml.init(xmlBuffer, 2048, xml_html_callback);
@@ -730,7 +740,7 @@ void task_wifi_connection(lv_timer_t *timer) {
         case CONFIG_CODE_2:
             // ver si hay algún llavero
             uidS = read_id();
-            if (keypad_done|| !uidS.isEmpty()) {
+            if (keypad_done || !uidS.isEmpty()) {
                 keypad_done = 0;
                 // si se ha leído un llavero, simular la introducción del código
                 if (!uidS.isEmpty()) {
@@ -964,7 +974,7 @@ void actualiza_hora() {
     time_t now;
     char strftime_buf[64];
     char fecha_final[64];
-    struct tm timeinfo {};
+    struct tm timeinfo{};
 
     time(&now);
 
@@ -1213,7 +1223,7 @@ static void ta_login_submit_event_cb(lv_event_t *e) {
         String clave_convertida = "";
         const char *ptr = lv_textarea_get_text(txt_password_login);
 
-        while(*ptr) {
+        while (*ptr) {
             clave_convertida += (int) (*ptr);
             ptr++;
         }
@@ -1222,7 +1232,8 @@ static void ta_login_submit_event_cb(lv_event_t *e) {
         String clave = rsa_cifrar(clave_convertida.c_str(), "3584956249", "356056806984207294102423357623243547284021");
 
         // generar parámetros del formulario de autenticación
-        datos = "N_V_=NV_" + String(random(10000)) + "&rndval=" + random(100000000) + "&NAV_WEB_NOMBRE=Netscape&NAV_WEB_VERSION=5&RESOLUCION=1024&CLAVECIFRADA="
+        datos = "N_V_=NV_" + String(random(10000)) + "&rndval=" + random(100000000) +
+                "&NAV_WEB_NOMBRE=Netscape&NAV_WEB_VERSION=5&RESOLUCION=1024&CLAVECIFRADA="
                 + clave + "&USUARIO=" + usuario + "&C_INTERFAZ=SENECA";
 
         response = "";
@@ -1265,7 +1276,7 @@ static void btn_config_event_cb(lv_event_t *e) {
             const char *str_psk = lv_textarea_get_text(txt_psk_config);
             if (!NVS.getString("net.wifi_ssid").equals(str_ssid) ||
                 !NVS.getString("net.wifi_psk").equals(str_psk)
-            ) {
+                    ) {
                 NVS.setString("net.wifi_ssid", lv_textarea_get_text(txt_ssid_config));
                 NVS.setString("net.wifi_psk", lv_textarea_get_text(txt_psk_config));
                 reboot = 1;
@@ -1407,7 +1418,7 @@ void create_scr_splash() {
     lv_obj_set_style_bg_color(scr_splash, LV_COLOR_MAKE(255, 255, 255), LV_PART_MAIN);
 
     // Logo de la CED centrado
-    LV_IMG_DECLARE(logo_ced);
+    LV_IMG_DECLARE(logo_ced)
     lv_obj_t *img = lv_img_create(scr_splash);
     lv_img_set_src(img, &logo_ced);
     lv_obj_align(img, LV_ALIGN_CENTER, 0, 0);
@@ -1611,7 +1622,7 @@ void create_scr_login() {
 }
 
 void create_scr_config() {
-    static const char *botones[] = { "" LV_SYMBOL_OK, "" LV_SYMBOL_CLOSE, nullptr };
+    static const char *botones[] = {"" LV_SYMBOL_OK, "" LV_SYMBOL_CLOSE, nullptr};
     // CREAR PANTALLA DE CONFIGURACIÓN
     scr_config = lv_obj_create(nullptr);
     lv_obj_set_style_bg_color(scr_config, LV_COLOR_MAKE(255, 255, 255), LV_PART_MAIN);
@@ -1631,7 +1642,7 @@ void create_scr_config() {
     // Crear pestañas
     lv_obj_t *tabview_config;
     tabview_config = lv_tabview_create(scr_config, LV_DIR_TOP, 50);
-    lv_obj_t * tab_btns = lv_tabview_get_tab_btns(tabview_config);
+    lv_obj_t *tab_btns = lv_tabview_get_tab_btns(tabview_config);
     lv_obj_set_style_pad_right(tab_btns, LV_HOR_RES * 2 / 10 + 3, 0);
 
     lv_obj_set_height(tabview_config, LV_VER_RES);
