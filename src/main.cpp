@@ -222,7 +222,9 @@ String read_id();
 
 void actualiza_hora();
 
-void config_request(lv_obj_t *scr);
+void config_request();
+
+void config_lock_request();
 
 void keypad_request(const char *mensaje);
 
@@ -533,23 +535,32 @@ void process_seneca_response() {
 
 void task_wifi_connection(lv_timer_t *timer) {
     static enum {
-        CONNECTING, NTP_START, NTP_WAIT, CHECKING, CHECK_WAIT, CHECK_RETRY, LOGIN_SCREEN, WAITING, CONFIG_SCREEN, DONE
-    } state = CONNECTING;
+        INIT, CONNECTING, NTP_START, NTP_WAIT, CHECKING, CHECK_WAIT, CHECK_RETRY, LOGIN_SCREEN, WAITING,
+        CONFIG_SCREEN_LOCK, CONFIG_SCREEN, CONFIG_CODE_1, CONFIG_CODE_2, DONE
+    } state = INIT;
 
     static int cuenta = 0;
     static int code;
     IPAddress ip;
 
-    String body = "";
+    static String empty_body = "";
 
     switch (state) {
+        case INIT:
+            if (NVS.getString("sec.code").isEmpty()) {
+                state = CONFIG_CODE_1;
+                keypad_request("Creación del código de administración");
+            } else {
+                state = CONNECTING;
+            }
+            break;
         case DONE:
             lv_timer_del(timer);
             return;
         case CONNECTING:
             lv_obj_clear_flag(spinner_splash, LV_OBJ_FLAG_HIDDEN);
             if (configuring) {
-                config_request(scr_splash);
+                config_request();
                 state = CONFIG_SCREEN;
                 break;
             }
@@ -596,7 +607,7 @@ void task_wifi_connection(lv_timer_t *timer) {
             if (!punto.isEmpty()) {
                 process_token("0");
             } else {
-                send_seneca_request_data(body);
+                send_seneca_request_data(empty_body);
             }
 
             state = CHECK_WAIT;
@@ -667,10 +678,56 @@ void task_wifi_connection(lv_timer_t *timer) {
                 lv_timer_create(task_main, 100, nullptr);
             }
             break;
+        case CONFIG_SCREEN_LOCK:
+            if (keypad_done == 1) {
+                if (read_code.isEmpty()) {
+                    keypad_done = 0;
+                    configuring = 0;
+                    state = CONNECTING;
+                    lv_scr_load(scr_splash);
+                    break;
+                }
+                if (read_code.equals(NVS.getString("sec.code"))) {
+                    config_request();
+                    state = CONFIG_SCREEN;
+                    break;
+                }
+                read_code = "";
+                set_estado_codigo("Código incorrecto");
+                keypad_done = 0;
+                lv_textarea_set_text(txt_codigo, "");
+            }
+            break;
         case CONFIG_SCREEN:
             if (!configuring) {
                 lv_scr_load(scr_splash);
                 state = CONNECTING;
+            }
+            break;
+        case CONFIG_CODE_1:
+            if (keypad_done) {
+                keypad_done = 0;
+                if (!read_code.isEmpty()) {
+                    response = read_code;
+                    keypad_request("Confirme código");
+                    state = CONFIG_CODE_2;
+                }
+            }
+            break;
+        case CONFIG_CODE_2:
+            if (keypad_done) {
+                keypad_done = 0;
+                if (!read_code.isEmpty()) {
+                    if (response.equals(read_code)) {
+                        NVS.setString("sec.code", read_code, true);
+                        lv_scr_load(scr_splash);
+                        state = CONNECTING;
+                        read_code = "";
+                    } else {
+                        keypad_request("Los códigos no coinciden. Vuelva a escribir el código");
+                        state = CONFIG_CODE_1;
+                    }
+                }
             }
             break;
     }
@@ -678,7 +735,7 @@ void task_wifi_connection(lv_timer_t *timer) {
 
 void task_main(lv_timer_t *timer) {
     static enum {
-        DONE, IDLE, CARD_PRESENT, CHECK_ONGOING, CHECK_RESULT_WAIT, CONFIG_SCREEN, NO_NETWORK
+        DONE, IDLE, CARD_PRESENT, CHECK_ONGOING, CHECK_RESULT_WAIT, CONFIG_SCREEN_LOCK, CONFIG_SCREEN, NO_NETWORK
     } state = IDLE;
 
     static int cuenta = 0;
@@ -692,8 +749,8 @@ void task_main(lv_timer_t *timer) {
         case IDLE:
             cuenta++;
             if (configuring) {
-                config_request(scr_main);
-                state = CONFIG_SCREEN;
+                config_lock_request();
+                state = CONFIG_SCREEN_LOCK;
                 break;
             }
             if (keypad_requested) {
@@ -752,22 +809,24 @@ void task_main(lv_timer_t *timer) {
             state = CHECK_ONGOING;
             break;
         case CHECK_ONGOING:
-            if (http_request_status == HTTP_ERROR || (http_request_status == HTTP_DONE && http_status_code != 200)) {
-                cuenta++;
-                if (cuenta > 40) {
-                    cuenta = 0;
-                    set_estado_check("Reintentando envío, espere por favor...");
-                    process_token(uidS);
-                }
-                break;
-            }
             if (http_request_status == HTTP_ONGOING) {
                 break;
             }
-            process_seneca_response();
-            parse_seneca_response();
-            cuenta = 0;
-            state = CHECK_RESULT_WAIT;
+            if (http_request_status == HTTP_DONE && http_status_code == 200) {
+                process_seneca_response();
+                parse_seneca_response();
+                cuenta = 0;
+                state = CHECK_RESULT_WAIT;
+            } else {
+                if (cuenta == 0) {
+                    set_estado_check("Reintentando envío, espere por favor...");
+                }
+                cuenta++;
+                if (cuenta > 40) {
+                    cuenta = 0;
+                    process_token(uidS);
+                }
+            }
             break;
         case CHECK_RESULT_WAIT:
             cuenta++;
@@ -787,6 +846,25 @@ void task_main(lv_timer_t *timer) {
                 if (cuenta % 20 == 0) {
                     WiFi.reconnect();
                 }
+            }
+            break;
+        case CONFIG_SCREEN_LOCK:
+            if (keypad_done == 1) {
+                if (read_code.isEmpty()) {
+                    keypad_done = 0;
+                    configuring = 0;
+                    state = IDLE;
+                    lv_scr_load(scr_main);
+                    break;
+                }
+                if (read_code.equals(NVS.getString("sec.code"))) {
+                    config_request();
+                    state = CONFIG_SCREEN;
+                    break;
+                }
+                keypad_request("Código incorrecto");
+                keypad_done = 0;
+                lv_textarea_set_text(txt_codigo, "");
             }
             break;
         case CONFIG_SCREEN:
@@ -819,16 +897,21 @@ String read_id() {
     return uidS;
 }
 
-void config_request(lv_obj_t *scr) {
+void config_request() {
+    read_code = "";
     update_scr_config();
-    set_estado_codigo("Código de administrador");
-    lv_textarea_set_text(txt_codigo, "");
     lv_scr_load(scr_config);
+}
+
+void config_lock_request() {
+    read_code = "";
+    keypad_request("Introduzca código de administración");
 }
 
 void keypad_request(const char *mensaje) {
     keypad_requested = 0;
     keypad_done = 0;
+    read_code = "";
     set_estado_codigo(mensaje);
     lv_textarea_set_text(txt_codigo, "");
     lv_scr_load(scr_codigo);
@@ -1251,6 +1334,7 @@ void create_scr_splash() {
     lbl_version_splash = lv_label_create(scr_splash);
     lv_obj_set_style_text_font(lbl_version_splash, &mulish_16, LV_PART_MAIN);
     lv_obj_set_style_text_align(lbl_version_splash, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
+    lv_obj_set_style_text_color(lbl_version_splash, lv_palette_main(LV_PALETTE_BLUE_GREY), LV_PART_MAIN);
     lv_label_set_text(lbl_version_splash, PUNTO_CONTROL_VERSION);
     lv_obj_align(lbl_version_splash, LV_ALIGN_BOTTOM_LEFT, 10, -10);
 
