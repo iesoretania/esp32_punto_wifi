@@ -1282,6 +1282,24 @@ static void sld_brightness_event_cb(lv_event_t *e) {
     }
 }
 
+static void btn_punto_control_event_cb(lv_event_t *e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_CLICKED) {
+        NVS.erase("CPP-puntToken", true);
+        esp_restart();
+    }
+}
+
+static void btn_logout_event_cb(lv_event_t *e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_CLICKED) {
+        NVS.erase("CPP-authToken");
+        NVS.erase("CPP-puntToken");
+        NVS.commit();
+        esp_restart();
+    }
+}
+
 static void btn_numpad_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
     lv_obj_t *obj = lv_event_get_target(e);
@@ -1368,7 +1386,7 @@ void create_scr_splash() {
     // Etiqueta de estado actual centrada en la parte superior
     lbl_estado_splash = lv_label_create(scr_splash);
     lv_obj_set_style_text_font(lbl_estado_splash, &mulish_24, LV_PART_MAIN);
-    lv_obj_set_style_text_color(lbl_estado_splash, lv_palette_main(LV_PALETTE_BLUE_GREY), LV_PART_MAIN);
+    lv_obj_set_style_text_color(lbl_estado_splash, lv_palette_main(LV_PALETTE_INDIGO), LV_PART_MAIN);
     lv_obj_set_style_text_align(lbl_estado_splash, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
     set_estado_splash("Inicializando...");
 
@@ -1586,7 +1604,14 @@ void create_scr_config() {
     lv_obj_set_height(tabview_config, LV_VER_RES);
     lv_obj_t *tab_red_config = lv_tabview_add_tab(tabview_config, "Red");
     lv_obj_t *tab_pantalla_config = lv_tabview_add_tab(tabview_config, "Pantalla");
-    lv_obj_t *tab_red_seguridad = lv_tabview_add_tab(tabview_config, "Seguridad");
+    lv_obj_t *tab_seguridad_config = lv_tabview_add_tab(tabview_config, "Seguridad");
+
+    static lv_style_t style_bg;
+    lv_style_init(&style_bg);
+    lv_style_set_pad_all(&style_bg, 0);
+    lv_style_set_pad_gap(&style_bg, 0);
+    lv_style_set_clip_corner(&style_bg, true);
+    lv_style_set_border_width(&style_bg, 0);
 
     // Crear botón de aceptar y cancelar
     lv_obj_t *btn_matrix_config = lv_btnmatrix_create(scr_config);
@@ -1596,6 +1621,7 @@ void create_scr_config() {
     lv_obj_set_style_pad_all(btn_matrix_config, 3, LV_PART_MAIN);
     lv_obj_align(btn_matrix_config, LV_ALIGN_TOP_RIGHT, 0, 0);
     lv_obj_add_event_cb(btn_matrix_config, btn_config_event_cb, LV_EVENT_ALL, nullptr);
+    lv_obj_add_style(btn_matrix_config, &style_bg, LV_PART_MAIN);
 
     // PANEL DE CONFIGURACIÓN DE RED
     lv_obj_set_style_pad_left(tab_red_config, LV_HOR_RES * 8 / 100, 0);
@@ -1626,7 +1652,7 @@ void create_scr_config() {
     lv_textarea_set_placeholder_text(txt_psk_config, "Mínimo 6 caracteres");
     lv_obj_add_event_cb(txt_psk_config, ta_kb_form_event_cb, LV_EVENT_ALL, tabview_config);
 
-    // Botón restaurar configuración
+    // Botón restaurar configuración de red
     lv_obj_t *btn_wifi_reset_config = lv_btn_create(tab_red_config);
     lv_obj_set_height(btn_wifi_reset_config, LV_SIZE_CONTENT);
     lv_obj_add_event_cb(btn_wifi_reset_config, btn_reset_wifi_config_event_cb, LV_EVENT_CLICKED, nullptr);
@@ -1635,6 +1661,12 @@ void create_scr_config() {
     lv_label_set_text(lbl_reset_wifi, "Restaurar conexión " PUNTO_CONTROL_SSID_PREDETERMINADO);
     lv_obj_align(lbl_reset_wifi, LV_ALIGN_TOP_MID, 0, 0);
 
+    lv_obj_t *lbl_mac_wifi = lv_label_create(tab_red_config);
+    String mac = "Dirección MAC: " + WiFi.macAddress();
+    lv_label_set_text(lbl_mac_wifi, mac.c_str());
+    lv_obj_set_style_text_align(lbl_mac_wifi, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+    lv_obj_add_style(lbl_mac_wifi, &style_text_muted, LV_PART_MAIN);
+
     // Colocar elementos en una rejilla (4 filas, 2 columnas)
     static lv_coord_t grid_col_dsc[] = {LV_GRID_FR(1), LV_GRID_FR(3), LV_GRID_TEMPLATE_LAST};
     static lv_coord_t grid_red_row_dsc[] = {
@@ -1642,6 +1674,7 @@ void create_scr_config() {
             LV_GRID_CONTENT,  /* SSID */
             LV_GRID_CONTENT,  /* PSK */
             LV_GRID_CONTENT,  /* Restaurar, botón */
+            LV_GRID_CONTENT,  /* Info MAC */
             LV_GRID_TEMPLATE_LAST
     };
 
@@ -1653,6 +1686,7 @@ void create_scr_config() {
     lv_obj_set_grid_cell(lbl_psk_config, LV_GRID_ALIGN_END, 0, 1, LV_GRID_ALIGN_CENTER, 2, 1);
     lv_obj_set_grid_cell(txt_psk_config, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_START, 2, 1);
     lv_obj_set_grid_cell(btn_wifi_reset_config, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 3, 1);
+    lv_obj_set_grid_cell(lbl_mac_wifi, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 4, 1);
 
     // PANEL DE CONFIGURACIÓN DE PANTALLA
     lv_obj_set_style_pad_left(tab_pantalla_config, LV_HOR_RES * 8 / 100, 0);
@@ -1698,7 +1732,49 @@ void create_scr_config() {
     lv_obj_set_grid_cell(sld_brillo_config, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_START, 2, 1);
     lv_obj_set_grid_cell(btn_calibrar_config, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 4, 1);
 
-    lv_obj_scroll_to_view_recursive(txt_ssid_config, LV_ANIM_ON);
+    // PANEL DE CONFIGURACIÓN DE SEGURIDAD
+    lv_obj_set_style_pad_left(tab_seguridad_config, LV_HOR_RES * 8 / 100, 0);
+    lv_obj_set_style_pad_right(tab_seguridad_config, LV_HOR_RES * 8 / 100, 0);
+
+    lv_obj_t *lbl_seguridad_config = lv_label_create(tab_seguridad_config);
+    lv_label_set_text(lbl_seguridad_config, "Parámetros de seguridad");
+    lv_obj_add_style(lbl_seguridad_config, &style_title, LV_PART_MAIN);
+
+    // Botón para cambiar de punto de acceso
+    lv_obj_t *btn_punto_acceso_config = lv_btn_create(tab_seguridad_config);
+    lv_obj_set_height(btn_punto_acceso_config, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_color(btn_punto_acceso_config, lv_palette_main(LV_PALETTE_ORANGE), LV_PART_MAIN);
+    lv_obj_add_event_cb(btn_punto_acceso_config, btn_punto_control_event_cb, LV_EVENT_CLICKED, nullptr);
+    lv_obj_t *lbl_punto_acceso_config = lv_label_create(btn_punto_acceso_config);
+    lv_label_set_text(lbl_punto_acceso_config, "Cambiar punto de acceso activo");
+    lv_obj_align(lbl_punto_acceso_config, LV_ALIGN_TOP_MID, 0, 0);
+
+    // Botón para cerrar sesión
+    lv_obj_t *btn_logout_config = lv_btn_create(tab_seguridad_config);
+    lv_obj_set_height(btn_logout_config, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_color(btn_logout_config, lv_palette_main(LV_PALETTE_RED), LV_PART_MAIN);
+    lv_obj_add_event_cb(btn_logout_config, btn_logout_event_cb, LV_EVENT_CLICKED, nullptr);
+    lv_obj_t *lbl_logout_config = lv_label_create(btn_logout_config);
+    lv_label_set_text(lbl_logout_config, "Cerrar sesión");
+    lv_obj_align(lbl_logout_config, LV_ALIGN_TOP_MID, 0, 0);
+
+    // Colocar elementos en una rejilla (7 filas, 2 columnas)
+    static lv_coord_t grid_seguridad_row_dsc[] = {
+            LV_GRID_CONTENT,  /* Título */
+            5,                /* Separador */
+            LV_GRID_CONTENT,  /* Forzar activación */
+            5,                /* Separador */
+            LV_GRID_CONTENT,  /* Cambiar punto de acceso */
+            5,                /* Separador */
+            LV_GRID_CONTENT,  /* Cerrar sesión */
+            LV_GRID_TEMPLATE_LAST
+    };
+
+    lv_obj_set_grid_dsc_array(tab_seguridad_config, grid_col_dsc, grid_seguridad_row_dsc);
+
+    lv_obj_set_grid_cell(lbl_seguridad_config, LV_GRID_ALIGN_START, 0, 2, LV_GRID_ALIGN_CENTER, 0, 1);
+    lv_obj_set_grid_cell(btn_punto_acceso_config, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 4, 1);
+    lv_obj_set_grid_cell(btn_logout_config, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 6, 1);
 }
 
 void create_scr_selection() {
@@ -1786,6 +1862,8 @@ void update_scr_config() {
     uint64_t brillo = NVS.getInt("scr.brightness");
     if (brillo == 0) brillo = PUNTO_CONTROL_BRILLO_PREDETERMINADO;
     lv_slider_set_value(sld_brillo_config, brillo, LV_ANIM_OFF);
+    // Comenzar en la primera página
+    lv_obj_scroll_to_view_recursive(txt_ssid_config, LV_ANIM_OFF);
 }
 
 void loop() {
