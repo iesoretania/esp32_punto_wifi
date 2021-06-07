@@ -12,6 +12,8 @@
 #include <ArduinoNvs.h>
 #include <mbedtls/bignum.h>
 #include <esp_http_client.h>
+#include <mbedtls/md.h>
+#include <lv_qrcode.h>
 
 #define SCREEN_WIDTH 480
 #define SCREEN_HEIGHT 320
@@ -46,6 +48,9 @@ typedef enum {
 HttpRequestStatus http_request_status;
 int http_status_code;
 String response;
+uint32_t punto_id = 0;
+char clave_punto[81] = { 0 };
+byte punto_key[80];
 
 esp_err_t http_event_handle(esp_http_client_event_t *evt) {
     String cookie_value, cookie_name, tmp;
@@ -153,6 +158,7 @@ static lv_obj_t *lbl_hora_main;
 static lv_obj_t *lbl_fecha_main;
 static lv_obj_t *lbl_estado_main;
 static lv_obj_t *lbl_icon_main;
+static lv_obj_t *qr_main;
 
 static lv_obj_t *scr_check;      // Pantalla de comprobación
 static lv_obj_t *lbl_estado_check;
@@ -222,7 +228,7 @@ static void ta_config_click_event_cb(lv_event_t *e);
 
 String read_id();
 
-void actualiza_hora();
+time_t actualiza_hora();
 
 void config_request();
 
@@ -231,6 +237,8 @@ void config_lock_request();
 void keypad_request(const char *mensaje);
 
 void setBrightness(uint64_t brillo);
+
+uint32_t calcula_otp(time_t now);
 
 void set_estado_splash_format(const char *string, const char *p) {
     lv_label_set_text_fmt(lbl_estado_splash, string, p);
@@ -275,6 +283,11 @@ void set_estado_main(const char *string) {
     lv_obj_align_to(lbl_estado_main, lbl_fecha_main, LV_ALIGN_OUT_BOTTOM_MID, 0, 20);
 }
 
+void set_estado_check_format(const char *string, int p) {
+    lv_label_set_text_fmt(lbl_estado_check, string, p);
+    lv_obj_align_to(lbl_estado_check, lbl_icon_check, LV_ALIGN_OUT_BOTTOM_MID, 0, 25);
+}
+
 void set_estado_check(const char *string) {
     lv_label_set_text(lbl_estado_check, string);
     lv_obj_align_to(lbl_estado_check, lbl_icon_check, LV_ALIGN_OUT_BOTTOM_MID, 0, 25);
@@ -285,11 +298,11 @@ void set_estado_codigo(const char *string) {
     lv_obj_align(lbl_estado_codigo, LV_ALIGN_TOP_MID, 0, 25);
 }
 
-void set_icon_text(lv_obj_t *label, const char *text, lv_palette_t color, int bottom) {
+void set_icon_text(lv_obj_t *label, const char *text, lv_palette_t color, int bottom, int offset) {
     lv_obj_set_style_text_color(label, lv_palette_main(color), LV_PART_MAIN);
     lv_label_set_text(label, text);
     lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-    lv_obj_align(label, bottom ? LV_ALIGN_BOTTOM_MID : LV_ALIGN_TOP_MID, 0, bottom ? -15 : 15);
+    lv_obj_align(label, bottom ? LV_ALIGN_BOTTOM_MID : LV_ALIGN_TOP_MID, offset, bottom ? -15 : 15);
 }
 
 void set_error_login_text(const char *string) {
@@ -372,7 +385,10 @@ int send_seneca_data(String &body) {
     http_request_status = HTTP_ONGOING;
 
     // hacer la petición
-    return esp_http_client_perform(http_client);
+    int r = esp_http_client_perform(http_client);
+    if (r) http_request_status = HTTP_ERROR;
+
+    return r;
 }
 
 int send_seneca_login_data(String &body) {
@@ -414,22 +430,22 @@ int parse_seneca_response() {
 
                 // mostrar respuesta en pantalla
                 if (response.startsWith("Entrada")) {
-                    set_icon_text(lbl_icon_check, "\uF2F6", LV_PALETTE_GREEN, 0);
+                    set_icon_text(lbl_icon_check, "\uF2F6", LV_PALETTE_GREEN, 0, 0);
                 } else if (response.startsWith("Salida")) {
-                    set_icon_text(lbl_icon_check, "\uF2F5", LV_PALETTE_RED, 0);
+                    set_icon_text(lbl_icon_check, "\uF2F5", LV_PALETTE_RED, 0, 0);
                 } else {
-                    set_icon_text(lbl_icon_check, "\uF071", LV_PALETTE_ORANGE, 0);
+                    set_icon_text(lbl_icon_check, "\uF071", LV_PALETTE_ORANGE, 0, 0);
                 }
                 set_estado_check(response.c_str());
 
                 ok = 1; // éxito
             }
         } else {
-            set_icon_text(lbl_icon_check, "\uF071", LV_PALETTE_ORANGE, 0);
+            set_icon_text(lbl_icon_check, "\uF071", LV_PALETTE_ORANGE, 0, 0);
             set_estado_check("Se ha obtenido una respuesta desconocida desde Séneca.");
         }
     } else {
-        set_icon_text(lbl_icon_check, "\uF071", LV_PALETTE_ORANGE, 0);
+        set_icon_text(lbl_icon_check, "\uF071", LV_PALETTE_ORANGE, 0, 0);
         set_estado_check("Ha ocurrido un error en la comunicación con Séneca.");
     }
 
@@ -513,6 +529,8 @@ void process_token(String uid) {
 }
 
 void process_seneca_response() {
+    const char base32[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+
     modo = "";
     punto = "";
     xCentro = "";
@@ -525,7 +543,43 @@ void process_seneca_response() {
     // inicialmente no hay etiqueta abierta, procesar carácter a carácter
     xmlStatus = 0;
 
-    char *cadena = const_cast<char *>(response.c_str());
+    // Id del punto de control
+    char *cadena = (char *)(response.c_str());
+    char *pos = strstr(cadena, "|X_PUNACCCONTPRE=");
+    if (pos) {
+        pos += 17;
+        punto_id = 0;
+        while (*pos >= '0' && *pos <= '9') {
+            punto_id = punto_id * 10 + (*pos - '0');
+            pos++;
+        }
+
+        // Clave del punto de control (para generar QR)
+        pos = strstr(cadena, "base32ToHex('");
+        if (pos) {
+            strncpy(clave_punto, pos + 13, 80);
+            clave_punto[80] = '\0';
+            long long acum = 0;
+            int num_bits = 0;
+            int pos_key = 0;
+            char *pos = clave_punto;
+            while (*pos != '\0') {
+                char *v = strchr(base32, *pos);
+                if (v == nullptr) {
+                    break;
+                }
+                acum = acum * 32 + (v - base32);
+                num_bits += 5;
+                if (num_bits >= 8) {
+                    punto_key[pos_key] = acum >> (num_bits - 8);
+                    acum -= punto_key[pos_key] << (num_bits - 8);
+                    num_bits -= 8;
+                    pos_key++;
+                }
+                pos++;
+            }
+        }
+    }
     while (*cadena != 0) {
         xml.processChar(*cadena);
         cadena++;
@@ -662,7 +716,6 @@ void task_wifi_connection(lv_timer_t *timer) {
             }
             break;
         case LOGIN_SCREEN:
-            cuenta++;
             if (lv_scr_act() == scr_splash) {
                 cuenta = 0;
                 state = CHECKING;
@@ -789,12 +842,13 @@ void task_main(lv_timer_t *timer) {
 
     static int cuenta = 0;
     static String uidS;
+    static uint32_t otp;
+    static time_t last_now = 0;
 
     switch (state) {
         case DONE:
             lv_timer_del(timer);
             return;
-
         case IDLE:
             cuenta++;
             if (configuring) {
@@ -806,7 +860,10 @@ void task_main(lv_timer_t *timer) {
                 keypad_request("Introduzca PIN");
             }
             if (WiFi.status() != WL_CONNECTED) {
-                set_icon_text(lbl_icon_main, "\uF252", LV_PALETTE_RED, 1);
+                set_icon_text(lbl_icon_main, "\uF252", LV_PALETTE_RED, 1, 0);
+                lv_obj_clear_flag(lbl_estado_main, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_clear_flag(lbl_icon_main, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_add_flag(qr_main, LV_OBJ_FLAG_HIDDEN);
                 state = NO_NETWORK;
                 lv_scr_load(scr_main);
             } else {
@@ -821,7 +878,7 @@ void task_main(lv_timer_t *timer) {
                 }
 
                 if (!uidS.isEmpty()) {
-                    set_icon_text(lbl_icon_check, "\uF252", LV_PALETTE_TEAL, 0);
+                    set_icon_text(lbl_icon_check, "\uF252", LV_PALETTE_TEAL, 0, 0);
                     if (llavero) {
                         set_estado_check("Llavero detectado. Comunicando con Séneca, espere por favor...");
                     } else {
@@ -838,15 +895,31 @@ void task_main(lv_timer_t *timer) {
                     }
                 }
 
-                actualiza_hora();
+                time_t now = actualiza_hora();
 
-                switch ((cuenta / 40) % 2) {
+                if (last_now == 0 || now / 30 != last_now) {
+                    last_now = now / 30;
+                    otp = calcula_otp(now);
+                    uidS = "AUTHKEY=" + String(otp) + "|X_PUNACCCONTPRE=" + punto_id;
+                    lv_qrcode_update(qr_main, uidS.c_str(), uidS.length());
+                }
+                switch ((cuenta / 10) % 10) {
                     case 0:
+                        lv_obj_clear_flag(lbl_estado_main, LV_OBJ_FLAG_HIDDEN);
+                        lv_obj_clear_flag(lbl_icon_main, LV_OBJ_FLAG_HIDDEN);
+                        lv_obj_add_flag(qr_main, LV_OBJ_FLAG_HIDDEN);
                         set_estado_main("Acerque llavero...");
                         break;
-                    case 1:
+                    case 5:
+                        lv_obj_clear_flag(lbl_estado_main, LV_OBJ_FLAG_HIDDEN);
+                        lv_obj_clear_flag(lbl_icon_main, LV_OBJ_FLAG_HIDDEN);
+                        lv_obj_add_flag(qr_main, LV_OBJ_FLAG_HIDDEN);
                         set_estado_main("Pulse pantalla para PIN");
                         break;
+                    default:
+                        lv_obj_add_flag(lbl_estado_main, LV_OBJ_FLAG_HIDDEN);
+                        lv_obj_add_flag(lbl_icon_main, LV_OBJ_FLAG_HIDDEN);
+                        lv_obj_clear_flag(qr_main, LV_OBJ_FLAG_HIDDEN);
                 }
             }
             break;
@@ -865,14 +938,20 @@ void task_main(lv_timer_t *timer) {
                 cuenta = 0;
                 state = CHECK_RESULT_WAIT;
             } else {
-                if (cuenta == 0) {
-                    set_estado_check("Reintentando envío, espere por favor...");
-                }
-                cuenta++;
-                if (cuenta > 40) {
+                if (cuenta == 150) {
+                    set_icon_text(lbl_icon_check, "\uF071", LV_PALETTE_RED, 0, 0);
+                    set_estado_check("Desisto. No se ha podido notificar a Séneca. Fiche de nuevo.");
                     cuenta = 0;
+                    state = CHECK_RESULT_WAIT;
+                    break;
+                }
+                if (cuenta % 10 == 0) {
+                    set_estado_check_format("Reintentando envío, espere por favor... Intento %d", cuenta / 10 + 1);
+                    esp_http_client_cleanup(http_client);
+                    initialize_http_client();
                     process_token(uidS);
                 }
+                cuenta++;
             }
             break;
         case CHECK_RESULT_WAIT:
@@ -887,7 +966,7 @@ void task_main(lv_timer_t *timer) {
             actualiza_hora();
             set_estado_main("NO HAY RED, ESPERE...");
             if (WiFi.status() == WL_CONNECTED) {
-                set_icon_text(lbl_icon_main, "\uF063", LV_PALETTE_BLUE, 1);
+                set_icon_text(lbl_icon_main, "\uF063", LV_PALETTE_BLUE, 1, 0);
                 state = IDLE;
             } else {
                 if (cuenta % 20 == 0) {
@@ -924,6 +1003,40 @@ void task_main(lv_timer_t *timer) {
                 lv_scr_load(scr_main);
             }
     }
+}
+
+uint32_t calcula_otp(time_t now) {
+    byte hmacResult[20];
+    byte payload[8] = { 0 };
+    mbedtls_md_context_t ctx;
+    mbedtls_md_type_t md_type = MBEDTLS_MD_SHA1;
+    const size_t payload_length = 8;
+
+    size_t key_length = strlen(clave_punto) * 5 / 8;
+
+    now /= 30;
+    payload[7] = now & 0xFF;
+    payload[6] = (now >> 8) & 0xFF;
+    payload[5] = (now >> 16) & 0xFF;
+    payload[4] = (now >> 24) & 0xFF;
+
+    mbedtls_md_init(&ctx);
+    mbedtls_md_setup(&ctx, mbedtls_md_info_from_type(md_type), 1);
+    mbedtls_md_hmac_starts(&ctx, (const unsigned char *) punto_key, key_length);
+    mbedtls_md_hmac_update(&ctx, (const unsigned char *) payload, payload_length);
+    mbedtls_md_hmac_finish(&ctx, hmacResult);
+    mbedtls_md_free(&ctx);
+
+    int offset = hmacResult[19] & 0xF;
+
+    uint32_t otp = hmacResult[offset];
+    otp = (otp << 8) + hmacResult[offset + 1];
+    otp = (otp << 8) + hmacResult[offset + 2];
+    otp = (otp << 8) + hmacResult[offset + 3];
+
+    otp = otp & 0x7fffffff;
+
+    return otp % 1000000;
 }
 
 String read_id() {
@@ -968,7 +1081,7 @@ void keypad_request(const char *mensaje) {
     lv_scr_load(scr_codigo);
 }
 
-void actualiza_hora() {
+time_t actualiza_hora() {
     const char *dia_semana[] = {"Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"};
 
     time_t now;
@@ -987,6 +1100,8 @@ void actualiza_hora() {
     strcat(fecha_final, ", ");
     strcat(fecha_final, strftime_buf);
     set_fecha_main(fecha_final);
+
+    return now;
 }
 
 void setup() {
@@ -1074,10 +1189,9 @@ void initialize_gui() {
 
     // Inicializar buffers del GUI
     static lv_disp_draw_buf_t disp_buf;
-    static lv_color_t buf1[LV_HOR_RES_MAX * 20];
-    static lv_color_t buf2[LV_HOR_RES_MAX * 20];
+    static lv_color_t buf1[LV_HOR_RES_MAX * 10];
 
-    lv_disp_draw_buf_init(&disp_buf, buf1, buf2, LV_HOR_RES_MAX * 20);
+    lv_disp_draw_buf_init(&disp_buf, buf1, nullptr, LV_HOR_RES_MAX * 10);
 
     // Inicializar interfaz gráfica
     static lv_disp_drv_t disp_drv;
@@ -1486,7 +1600,7 @@ void create_scr_main() {
     // Imagen de la flecha en la parte inferior
     lbl_icon_main = lv_label_create(scr_main);
     lv_obj_set_style_text_font(lbl_icon_main, &symbols, LV_PART_MAIN);
-    set_icon_text(lbl_icon_main, "\uF063", LV_PALETTE_BLUE, 1);
+    set_icon_text(lbl_icon_main, "\uF063", LV_PALETTE_BLUE, 1, 0);
 
     // Icono de configuración
     create_config_button(scr_main);
@@ -1501,6 +1615,14 @@ void create_scr_main() {
     lv_obj_align(btn_keypad_main, LV_ALIGN_BOTTOM_RIGHT, -10, -10);
     lv_obj_add_event_cb(btn_keypad_main, ta_keypad_click_event_cb, LV_EVENT_CLICKED, scr_main);
     lv_obj_add_event_cb(scr_main, ta_keypad_click_event_cb, LV_EVENT_CLICKED, scr_main);
+
+    // Código QR
+    qr_main = lv_qrcode_create(scr_main, 170, lv_color_hex3(0x0), lv_color_hex3(0xfff));
+    lv_qrcode_update(qr_main, "", 0);
+    //qr_main = lv_label_create(scr_main);
+    //lv_label_set_text(qr_main, "Hola");
+    lv_obj_align(qr_main, LV_ALIGN_BOTTOM_MID, 0, -15);
+    lv_obj_add_flag(qr_main, LV_OBJ_FLAG_HIDDEN);
 }
 
 void create_scr_check() {
@@ -1511,7 +1633,7 @@ void create_scr_check() {
     // Icono del estado de comprobación
     lbl_icon_check = lv_label_create(scr_check);
     lv_obj_set_style_text_font(lbl_icon_check, &symbols, LV_PART_MAIN);
-    set_icon_text(lbl_icon_check, "\uF252", LV_PALETTE_BLUE, 0);
+    set_icon_text(lbl_icon_check, "\uF252", LV_PALETTE_BLUE, 0, 0);
 
     // Etiqueta de estado de comprobación
     lbl_estado_check = lv_label_create(scr_check);
