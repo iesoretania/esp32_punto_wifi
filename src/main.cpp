@@ -15,9 +15,11 @@
 #include <mbedtls/md.h>
 #include <lv_qrcode.h>
 
+#include <melody_player.h>
+#include <melody_factory.h>
+
 #define SCREEN_WIDTH 480
 #define SCREEN_HEIGHT 320
-
 
 TFT_eSPI tft = TFT_eSPI();
 MFRC522 mfrc522(RFID_SDA_PIN, RFID_RST_PIN);
@@ -26,6 +28,8 @@ ArduinoNvs nvs;
 
 TinyXML xml;
 uint8_t xmlBuffer[2048];
+
+MelodyPlayer player(BUZZER_PIN, HIGH);
 
 // Gestión de peticiones HTTP
 int send_seneca_request_data(String &body);
@@ -219,6 +223,8 @@ void initialize_gui();
 void initialize_flash();
 
 void initialize_http_client();
+
+void initialize_melody_player();
 
 void task_main(lv_timer_t *);
 
@@ -428,14 +434,23 @@ int parse_seneca_response() {
                 // convertir respuesta a UTF-8
                 response = iso_8859_1_to_utf8(response);
 
+                Melody melody;
+
                 // mostrar respuesta en pantalla
                 if (response.startsWith("Entrada")) {
+                    const char* entrada_melody = "entrada:d=16,o=6,b=200: 8b";
+                    melody = MelodyFactory.loadRtttlString(entrada_melody);
                     set_icon_text(lbl_icon_check, "\uF2F6", LV_PALETTE_GREEN, 0, 0);
                 } else if (response.startsWith("Salida")) {
+                    const char* salida_melody = "salida:d=16,o=6,b=200: 8b, p, 8b";
+                    melody = MelodyFactory.loadRtttlString(salida_melody);
                     set_icon_text(lbl_icon_check, "\uF2F5", LV_PALETTE_RED, 0, 0);
                 } else {
+                    const char* error_melody = "error:d=16,o=6,b=180: 1c";
+                    melody = MelodyFactory.loadRtttlString(error_melody);
                     set_icon_text(lbl_icon_check, "\uF071", LV_PALETTE_ORANGE, 0, 0);
                 }
+                player.playAsync(melody);
                 set_estado_check(response.c_str());
 
                 ok = 1; // éxito
@@ -742,6 +757,10 @@ void task_wifi_connection(lv_timer_t *timer) {
         case WAITING:
             cuenta++;
             if (cuenta == 20) {
+                const char* init_melody = "Start:d=4,o=6,b=200: 8c, 8e, 4g";
+                Melody melody = MelodyFactory.loadRtttlString(init_melody);
+                player.playAsync(melody);
+
                 state = DONE;
                 lv_scr_load(scr_main);
                 lv_obj_clean(scr_splash);
@@ -1043,6 +1062,10 @@ String read_id() {
     String uidS;
 
     if (mfrc522.PICC_IsNewCardPresent()) {
+        const char* card_melody = "Card:d=16,o=5,b=200: g";
+        Melody melody = MelodyFactory.loadRtttlString(card_melody);
+        player.playAsync(melody);
+
         if (mfrc522.PICC_ReadCardSerial()) {
             uint32_t uid = (uint32_t) (
                     mfrc522.uid.uidByte[0] +
@@ -1112,8 +1135,8 @@ void setup() {
 
     // Activar iluminación del display al 100%
     pinMode(BACKLIGHT_PIN, OUTPUT);
-    ledcAttachPin(BACKLIGHT_PIN, 1);
-    ledcSetup(1, 5000, 8);
+    ledcAttachPin(BACKLIGHT_PIN, 2);
+    ledcSetup(2, 5000, 8);
 
     // Inicializar flash
     initialize_flash();
@@ -1131,6 +1154,9 @@ void setup() {
 
     // Inicializar subsistema HTTP
     initialize_http_client();
+
+    // Inicializar subsistema musical
+    initialize_melody_player();
 
     // Crear pantallas y cambiar a la pantalla de arranque
     keypad_requested = 0;
@@ -1228,12 +1254,18 @@ void initialize_gui() {
     tft.setTouch(calData);
 }
 
+void initialize_melody_player() {
+    const char* init_melody = "Init:d=4,o=6,b=200: 8c, 4g";
+    Melody melody = MelodyFactory.loadRtttlString(init_melody);
+    player.playAsync(melody);
+}
+
 void setBrightness(uint64_t brillo) {
     if (brillo == 0) brillo = PUNTO_CONTROL_BRILLO_PREDETERMINADO; // brillo por defecto
     if (brillo < 32) brillo = 32;
     if (brillo > 255) brillo = 255;
 
-    ledcWrite(1, brillo);
+    ledcWrite(2, brillo);
 }
 
 static void ta_kb_form_event_cb(lv_event_t *e) {
