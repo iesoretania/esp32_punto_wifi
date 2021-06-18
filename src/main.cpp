@@ -29,7 +29,7 @@ ArduinoNvs nvs;
 TinyXML xml;
 uint8_t xmlBuffer[2048];
 
-MelodyPlayer player(BUZZER_PIN, HIGH);
+MelodyPlayer player(BUZZER_PIN, LOW);
 
 // Gestión de peticiones HTTP
 int send_seneca_request_data(String &body);
@@ -860,6 +860,8 @@ void task_main(lv_timer_t *timer) {
     } state = IDLE;
 
     static int cuenta = 0;
+    static String last_pin = "";
+    static String pin = "";
     static String uidS;
     static uint32_t otp;
     static time_t last_now = 0;
@@ -873,10 +875,22 @@ void task_main(lv_timer_t *timer) {
             if (configuring) {
                 config_lock_request();
                 state = CONFIG_SCREEN_LOCK;
+                cuenta = 0;
                 break;
+            }
+            if (lv_scr_act() != scr_main) {
+                pin = lv_textarea_get_text(txt_codigo);
+                if (!pin.equals(last_pin)) {
+                    last_pin = pin;
+                    cuenta = 0;
+                }
+                // si a los 8 segundos no ha habido ningún cambio, cerrar pantalla de introducción de PIN
+                if (cuenta > 80) lv_scr_load(scr_main);
             }
             if (keypad_requested) {
                 keypad_request("Introduzca PIN");
+                cuenta = 0;
+                last_pin = "";
             }
             if (WiFi.status() != WL_CONNECTED) {
                 set_icon_text(lbl_icon_main, "\uF252", LV_PALETTE_RED, 1, 0);
@@ -994,6 +1008,15 @@ void task_main(lv_timer_t *timer) {
             }
             break;
         case CONFIG_SCREEN_LOCK:
+            cuenta++;
+            pin = lv_textarea_get_text(txt_codigo);
+            if (!pin.equals(last_pin)) {
+                last_pin = pin;
+                cuenta = 0;
+            }
+            // si a los 8 segundos no ha habido ningún cambio, cerrar pantalla de introducción de código
+            if (cuenta > 80) keypad_done = 1;
+
             uidS = read_id();
             if (keypad_done == 1 || !uidS.isEmpty()) {
                 if (!uidS.isEmpty()) {
