@@ -393,7 +393,7 @@ typedef void * lv_user_data_t;
 
 #define LV_USE_CHECKBOX     1
 
-#define LV_USE_CHART        1
+#define LV_USE_CHART        0
 
 #define LV_USE_DROPDOWN     1   /*Requires: lv_label*/
 
@@ -407,7 +407,7 @@ typedef void * lv_user_data_t;
 
 #define LV_USE_LINE         1
 
-#define LV_USE_METER        1
+#define LV_USE_METER        0
 
 #define LV_USE_ROLLER       1   /*Requires: lv_label*/
 #if LV_USE_ROLLER
@@ -423,7 +423,7 @@ typedef void * lv_user_data_t;
 #  define LV_TEXTAREA_DEF_PWD_SHOW_TIME     1500    /*ms*/
 #endif
 
-#define LV_USE_TABLE  1
+#define LV_USE_TABLE  0
 
 /*==================
  * EXTRA COMPONENTS
