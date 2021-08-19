@@ -1,3 +1,22 @@
+//
+// Copyright (C) 2020-2021: Luis Ramón López López
+//
+// This file is part of "Punto de Control de Presencia Wi-Fi".
+//
+// "Punto de Control de Presencia Wi-Fi" is free software: you can redistribute
+// it and/or modify it under the terms of the GNU General Public License as
+// published by the Free Software Foundation, either version 3 of the License,
+// or (at your option) any later version.
+//
+// "Punto de Control de Presencia Wi-Fi" is distributed in the hope that it will be
+// useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Foobar.  If not, see <https://www.gnu.org/licenses/>.
+//
+
 #include <Arduino.h>
 
 #include <punto_control.h>
@@ -13,13 +32,18 @@
 #include <mbedtls/bignum.h>
 #include <esp_http_client.h>
 #include <mbedtls/md.h>
-#include <lv_qrcode.h>
 
 #include <melody_player.h>
 #include <melody_factory.h>
 
 #define SCREEN_WIDTH 480
 #define SCREEN_HEIGHT 320
+
+#include "screens/scr_shared.h"
+#include "screens/scr_splash.h"
+#include "screens/scr_main.h"
+#include "screens/scr_check.h"
+#include "screens/scr_codigo.h"
 
 TFT_eSPI tft = TFT_eSPI();
 MFRC522 mfrc522(RFID_SDA_PIN, RFID_RST_PIN);
@@ -149,25 +173,6 @@ void espi_touch_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data) {
 }
 
 // Pantallas
-static lv_obj_t *scr_splash;     // Pantalla de inicio (splash screen)
-static lv_obj_t *spinner_splash;
-static lv_obj_t *lbl_ip_splash;
-static lv_obj_t *lbl_estado_splash;
-static lv_obj_t *lbl_version_splash;
-static lv_obj_t *btn_config_splash;
-
-static lv_obj_t *scr_main;       // Pantalla principal de lectura de código
-static lv_obj_t *lbl_nombre_main;
-static lv_obj_t *lbl_hora_main;
-static lv_obj_t *lbl_fecha_main;
-static lv_obj_t *lbl_estado_main;
-static lv_obj_t *lbl_icon_main;
-static lv_obj_t *qr_main;
-
-static lv_obj_t *scr_check;      // Pantalla de comprobación
-static lv_obj_t *lbl_estado_check;
-static lv_obj_t *lbl_icon_check;
-
 static lv_obj_t *scr_login;      // Pantalla de entrada de credenciales
 static lv_obj_t *pnl_login;
 static lv_obj_t *txt_usuario_login;
@@ -187,24 +192,7 @@ static lv_obj_t *txt_psk_config;
 static lv_obj_t *sld_brillo_config;
 static lv_obj_t *sw_forzar_activacion_config;
 
-static lv_obj_t *scr_codigo;     // Pantalla de introducción de código manual
-static lv_obj_t *lbl_estado_codigo;
-static lv_obj_t *txt_codigo;
-
 static lv_obj_t *kb;             // Teclado en pantalla
-
-static int configuring;
-
-static int keypad_requested;
-static int keypad_done;
-
-static String read_code;
-
-void create_scr_splash();
-
-void create_scr_main();
-
-void create_scr_check();
 
 void create_scr_login();
 
@@ -214,7 +202,6 @@ void create_scr_selection();
 
 void create_scr_calibracion();
 
-void create_scr_codigo();
 
 void update_scr_config();
 
@@ -230,8 +217,6 @@ void task_main(lv_timer_t *);
 
 static void ta_select_form_event_cb(lv_event_t *e);
 
-static void ta_config_click_event_cb(lv_event_t *e);
-
 String read_id();
 
 time_t actualiza_hora();
@@ -240,93 +225,14 @@ void config_request();
 
 void config_lock_request();
 
-void keypad_request(const char *mensaje);
 
 void setBrightness(uint64_t brillo);
 
 uint32_t calcula_otp(time_t now);
 
-void set_estado_splash_format(const char *string, const char *p) {
-    lv_label_set_text_fmt(lbl_estado_splash, string, p);
-    lv_obj_align(lbl_estado_splash, LV_ALIGN_TOP_MID, 0, 15);
-}
-
-void set_estado_splash(const char *string) {
-    lv_label_set_text(lbl_estado_splash, string);
-    lv_obj_align(lbl_estado_splash, LV_ALIGN_TOP_MID, 0, 15);
-}
-
-void set_ip_splash_format(const char *string, const char *p) {
-    lv_label_set_text_fmt(lbl_ip_splash, string, p);
-    lv_obj_align(lbl_ip_splash, LV_ALIGN_BOTTOM_MID, 0, -15);
-}
-
-void set_ip_splash(const char *string) {
-    lv_label_set_text(lbl_ip_splash, string);
-    lv_obj_align(lbl_ip_splash, LV_ALIGN_BOTTOM_MID, 0, -15);
-}
-
-void set_nombre_main(const char *string) {
-    lv_label_set_text(lbl_nombre_main, string);
-    lv_label_set_long_mode(lbl_nombre_main, LV_LABEL_LONG_SCROLL_CIRCULAR);
-    lv_obj_set_width(lbl_nombre_main, SCREEN_WIDTH);
-    lv_obj_set_style_text_align(lbl_nombre_main, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-    lv_obj_align(lbl_nombre_main, LV_ALIGN_TOP_MID, 0, 15);
-}
-
-void set_hora_main(const char *string) {
-    lv_label_set_text(lbl_hora_main, string);
-    lv_obj_align_to(lbl_hora_main, lbl_nombre_main, LV_ALIGN_OUT_BOTTOM_MID, 0, 15);
-}
-
-void set_fecha_main(const char *string) {
-    lv_label_set_text(lbl_fecha_main, string);
-    lv_obj_align_to(lbl_fecha_main, lbl_hora_main, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
-}
-
-void set_estado_main(const char *string) {
-    lv_label_set_text(lbl_estado_main, string);
-    lv_obj_align_to(lbl_estado_main, lbl_fecha_main, LV_ALIGN_OUT_BOTTOM_MID, 0, 20);
-}
-
-void set_estado_check_format(const char *string, int p) {
-    lv_label_set_text_fmt(lbl_estado_check, string, p);
-    lv_obj_align_to(lbl_estado_check, lbl_icon_check, LV_ALIGN_OUT_BOTTOM_MID, 0, 25);
-}
-
-void set_estado_check(const char *string) {
-    lv_label_set_text(lbl_estado_check, string);
-    lv_obj_align_to(lbl_estado_check, lbl_icon_check, LV_ALIGN_OUT_BOTTOM_MID, 0, 25);
-}
-
-void set_estado_codigo(const char *string) {
-    lv_label_set_text(lbl_estado_codigo, string);
-    lv_obj_align(lbl_estado_codigo, LV_ALIGN_TOP_MID, 0, 25);
-}
-
-void set_icon_text(lv_obj_t *label, const char *text, lv_palette_t color, int bottom, int offset) {
-    lv_obj_set_style_text_color(label, lv_palette_main(color), LV_PART_MAIN);
-    lv_label_set_text(label, text);
-    lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-    lv_obj_align(label, bottom ? LV_ALIGN_BOTTOM_MID : LV_ALIGN_TOP_MID, offset, bottom ? -15 : 15);
-}
 
 void set_error_login_text(const char *string) {
     lv_label_set_text(lbl_error_login, string);
-}
-
-lv_obj_t *create_config_button(lv_obj_t *parent) {
-    lv_obj_t *btn = lv_btn_create(parent);
-    lv_obj_t *lbl = lv_label_create(btn);
-
-    lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, LV_PART_MAIN);
-    lv_obj_set_style_text_font(lbl, &mulish_32, LV_PART_MAIN);
-    lv_label_set_text(lbl, LV_SYMBOL_SETTINGS);
-    lv_obj_set_style_text_color(lbl, lv_palette_main(LV_PALETTE_INDIGO), LV_PART_MAIN);
-    lv_obj_align_to(btn, parent, LV_ALIGN_BOTTOM_LEFT, 10, -10);
-    lv_obj_add_event_cb(btn, ta_config_click_event_cb, LV_EVENT_CLICKED, parent);
-
-    return btn;
 }
 
 String iso_8859_1_to_utf8(String &str) {
@@ -440,15 +346,15 @@ int parse_seneca_response() {
                 if (response.startsWith("Entrada")) {
                     const char* entrada_melody = "entrada:d=16,o=6,b=200: 8b";
                     melody = MelodyFactory.loadRtttlString(entrada_melody);
-                    set_icon_text(lbl_icon_check, "\uF2F6", LV_PALETTE_GREEN, 0, 0);
+                    set_icon_text_check("\uF2F6", LV_PALETTE_GREEN, 0, 0);
                 } else if (response.startsWith("Salida")) {
                     const char* salida_melody = "salida:d=16,o=6,b=200: 8b, p, 8b";
                     melody = MelodyFactory.loadRtttlString(salida_melody);
-                    set_icon_text(lbl_icon_check, "\uF2F5", LV_PALETTE_RED, 0, 0);
+                    set_icon_text_check("\uF2F5", LV_PALETTE_RED, 0, 0);
                 } else {
                     const char* error_melody = "error:d=16,o=6,b=180: 1c";
                     melody = MelodyFactory.loadRtttlString(error_melody);
-                    set_icon_text(lbl_icon_check, "\uF071", LV_PALETTE_ORANGE, 0, 0);
+                    set_icon_text_check("\uF071", LV_PALETTE_ORANGE, 0, 0);
                 }
                 player.playAsync(melody);
                 set_estado_check(response.c_str());
@@ -456,11 +362,11 @@ int parse_seneca_response() {
                 ok = 1; // éxito
             }
         } else {
-            set_icon_text(lbl_icon_check, "\uF071", LV_PALETTE_ORANGE, 0, 0);
+            set_icon_text_check("\uF071", LV_PALETTE_ORANGE, 0, 0);
             set_estado_check("Se ha obtenido una respuesta desconocida desde Séneca.");
         }
     } else {
-        set_icon_text(lbl_icon_check, "\uF071", LV_PALETTE_ORANGE, 0, 0);
+        set_icon_text_check("\uF071", LV_PALETTE_ORANGE, 0, 0);
         set_estado_check("Ha ocurrido un error en la comunicación con Séneca.");
     }
 
@@ -641,10 +547,10 @@ void task_wifi_connection(lv_timer_t *timer) {
                     break;
                 }
                 state = CONNECTING;
-                lv_scr_load(scr_splash);
+                load_scr_splash();
             }
         case CONNECTING:
-            lv_obj_clear_flag(spinner_splash, LV_OBJ_FLAG_HIDDEN);
+            show_splash_spinner();
             if (configuring) {
                 config_request();
                 state = CONFIG_SCREEN;
@@ -659,13 +565,13 @@ void task_wifi_connection(lv_timer_t *timer) {
                 cuenta++;
                 // si a los 10 segundos no nos hemos conectado, cambiar el número de versión por el icono de config.
                 if (cuenta % 100 == 0) {
-                    lv_obj_add_flag(lbl_version_splash, LV_OBJ_FLAG_HIDDEN);
-                    lv_obj_clear_flag(btn_config_splash, LV_OBJ_FLAG_HIDDEN);
+                    hide_splash_version();
+                    show_splash_config();
                 }
             }
             break;
         case NTP_START:
-            lv_obj_add_flag(btn_config_splash, LV_OBJ_FLAG_HIDDEN);
+            hide_splash_config();
             set_estado_splash("Ajustando hora...");
             setenv("TZ", PUNTO_CONTROL_HUSO_HORARIO, 1);
             tzset();
@@ -711,7 +617,7 @@ void task_wifi_connection(lv_timer_t *timer) {
                 if (tipo_acceso.isEmpty()) {
                     if (!punto.isEmpty()) {
                         state = WAITING;
-                        lv_obj_add_flag(spinner_splash, LV_OBJ_FLAG_HIDDEN);
+                        hide_splash_spinner();
                     } else {
                         state = LOGIN_SCREEN;
                         lv_scr_load(scr_selection);
@@ -731,7 +637,7 @@ void task_wifi_connection(lv_timer_t *timer) {
             }
             break;
         case LOGIN_SCREEN:
-            if (lv_scr_act() == scr_splash) {
+            if (is_loaded_scr_splash()) {
                 cuenta = 0;
                 state = CHECKING;
             }
@@ -742,7 +648,7 @@ void task_wifi_connection(lv_timer_t *timer) {
                     String param = "_MODO_=" + modo + "&USUARIO=" + usuario + "&CLAVE_P=";
                     response = "";
                     send_seneca_request_data(param);
-                    lv_scr_load(scr_splash);
+                    load_scr_splash();
                     cuenta = 0;
                     state = CHECK_WAIT;
                 } else {
@@ -762,8 +668,8 @@ void task_wifi_connection(lv_timer_t *timer) {
                 player.playAsync(melody);
 
                 state = DONE;
-                lv_scr_load(scr_main);
-                lv_obj_clean(scr_splash);
+                load_scr_main();
+                clean_scr_splash();
                 lv_timer_create(task_main, 100, nullptr);
             }
             break;
@@ -773,7 +679,7 @@ void task_wifi_connection(lv_timer_t *timer) {
                     keypad_done = 0;
                     configuring = 0;
                     state = CONNECTING;
-                    lv_scr_load(scr_splash);
+                    load_scr_splash();
                     break;
                 }
                 if (read_code.equals(NVS.getString("sec.code"))) {
@@ -784,12 +690,13 @@ void task_wifi_connection(lv_timer_t *timer) {
                 read_code = "";
                 set_estado_codigo("Código incorrecto");
                 keypad_done = 0;
-                lv_textarea_set_text(txt_codigo, "");
+
+                set_codigo_text("");
             }
             break;
         case CONFIG_SCREEN:
             if (!configuring) {
-                lv_scr_load(scr_splash);
+                load_scr_splash();
                 state = CONNECTING;
             }
             break;
@@ -821,7 +728,7 @@ void task_wifi_connection(lv_timer_t *timer) {
                 if (!read_code.isEmpty()) {
                     if (response.equals(read_code)) {
                         NVS.setString("sec.code", read_code, true);
-                        lv_scr_load(scr_splash);
+                        load_scr_splash();
                         state = CONNECTING;
                         read_code = "";
                     } else {
@@ -843,12 +750,12 @@ void task_wifi_connection(lv_timer_t *timer) {
                 if (read_code.equals(NVS.getString("sec.code"))) {
                     state = CONNECTING;
                     read_code = "";
-                    lv_scr_load(scr_splash);
+                    load_scr_splash();
                     break;
                 }
                 keypad_request("Código incorrecto");
                 keypad_done = 0;
-                lv_textarea_set_text(txt_codigo, "");
+                set_codigo_text("");
             }
             break;
     }
@@ -878,14 +785,14 @@ void task_main(lv_timer_t *timer) {
                 cuenta = 0;
                 break;
             }
-            if (lv_scr_act() != scr_main) {
-                pin = lv_textarea_get_text(txt_codigo);
+            if (is_loaded_scr_main()) {
+                pin = get_codigo_text();
                 if (!pin.equals(last_pin)) {
                     last_pin = pin;
                     cuenta = 0;
                 }
                 // si a los 8 segundos no ha habido ningún cambio, cerrar pantalla de introducción de PIN
-                if (cuenta > 80) lv_scr_load(scr_main);
+                if (cuenta > 80) load_scr_main();
             }
             if (keypad_requested) {
                 keypad_request("Introduzca PIN");
@@ -893,12 +800,12 @@ void task_main(lv_timer_t *timer) {
                 last_pin = "";
             }
             if (WiFi.status() != WL_CONNECTED) {
-                set_icon_text(lbl_icon_main, "\uF252", LV_PALETTE_RED, 1, 0);
-                lv_obj_clear_flag(lbl_estado_main, LV_OBJ_FLAG_HIDDEN);
-                lv_obj_clear_flag(lbl_icon_main, LV_OBJ_FLAG_HIDDEN);
-                lv_obj_add_flag(qr_main, LV_OBJ_FLAG_HIDDEN);
+                set_icon_text_main("\uF252", LV_PALETTE_RED, 1, 0);
+                show_main_estado();
+                show_main_icon();
+                hide_main_qr();
                 state = NO_NETWORK;
-                lv_scr_load(scr_main);
+                load_scr_main();
             } else {
                 int llavero;
                 if (!read_code.isEmpty()) {
@@ -911,19 +818,19 @@ void task_main(lv_timer_t *timer) {
                 }
 
                 if (!uidS.isEmpty()) {
-                    set_icon_text(lbl_icon_check, "\uF252", LV_PALETTE_TEAL, 0, 0);
+                    set_icon_text_check("\uF252", LV_PALETTE_TEAL, 0, 0);
                     if (llavero) {
                         set_estado_check("Llavero detectado. Comunicando con Séneca, espere por favor...");
                     } else {
                         set_estado_check("Enviando PIN a Séneca, espere por favor...");
                     }
-                    lv_scr_load(scr_check);
+                    load_scr_check();
                     state = CARD_PRESENT;
                     cuenta = 0;
                     break;
                 } else {
                     if (keypad_done) {
-                        lv_scr_load(scr_main);
+                        load_scr_main();
                         keypad_done = 0;
                     }
                 }
@@ -934,25 +841,25 @@ void task_main(lv_timer_t *timer) {
                     last_now = now / 30;
                     otp = calcula_otp(now);
                     uidS = "AUTHKEY=" + String(otp) + "|X_PUNACCCONTPRE=" + punto_id;
-                    lv_qrcode_update(qr_main, uidS.c_str(), uidS.length());
+                    update_main_qrcode(uidS.c_str(), uidS.length());
                 }
                 switch ((cuenta / 10) % 10) {
                     case 0:
-                        lv_obj_clear_flag(lbl_estado_main, LV_OBJ_FLAG_HIDDEN);
-                        lv_obj_clear_flag(lbl_icon_main, LV_OBJ_FLAG_HIDDEN);
-                        lv_obj_add_flag(qr_main, LV_OBJ_FLAG_HIDDEN);
+                        show_main_estado();
+                        show_main_icon();
+                        hide_main_qr();
                         set_estado_main("Acerque llavero...");
                         break;
                     case 5:
-                        lv_obj_clear_flag(lbl_estado_main, LV_OBJ_FLAG_HIDDEN);
-                        lv_obj_clear_flag(lbl_icon_main, LV_OBJ_FLAG_HIDDEN);
-                        lv_obj_add_flag(qr_main, LV_OBJ_FLAG_HIDDEN);
+                        show_main_estado();
+                        show_main_icon();
+                        hide_main_qr();
                         set_estado_main("Pulse pantalla para PIN");
                         break;
                     default:
-                        lv_obj_add_flag(lbl_estado_main, LV_OBJ_FLAG_HIDDEN);
-                        lv_obj_add_flag(lbl_icon_main, LV_OBJ_FLAG_HIDDEN);
-                        lv_obj_clear_flag(qr_main, LV_OBJ_FLAG_HIDDEN);
+                        hide_main_estado();
+                        hide_main_icon();
+                        show_main_qr();
                 }
             }
             break;
@@ -972,7 +879,7 @@ void task_main(lv_timer_t *timer) {
                 state = CHECK_RESULT_WAIT;
             } else {
                 if (cuenta == 150) {
-                    set_icon_text(lbl_icon_check, "\uF071", LV_PALETTE_RED, 0, 0);
+                    set_icon_text_check("\uF071", LV_PALETTE_RED, 0, 0);
                     set_estado_check("Desisto. No se ha podido notificar a Séneca. Fiche de nuevo.");
                     cuenta = 0;
                     state = CHECK_RESULT_WAIT;
@@ -991,7 +898,7 @@ void task_main(lv_timer_t *timer) {
             cuenta++;
             if (cuenta > 40 || (cuenta > 20 && mfrc522.PICC_IsNewCardPresent())) {
                 state = IDLE;
-                lv_scr_load(scr_main);
+                load_scr_main();
             }
             break;
         case NO_NETWORK:
@@ -999,7 +906,7 @@ void task_main(lv_timer_t *timer) {
             actualiza_hora();
             set_estado_main("NO HAY RED, ESPERE...");
             if (WiFi.status() == WL_CONNECTED) {
-                set_icon_text(lbl_icon_main, "\uF063", LV_PALETTE_BLUE, 1, 0);
+                set_icon_text_main("\uF063", LV_PALETTE_BLUE, 1, 0);
                 state = IDLE;
             } else {
                 if (cuenta % 20 == 0) {
@@ -1009,7 +916,7 @@ void task_main(lv_timer_t *timer) {
             break;
         case CONFIG_SCREEN_LOCK:
             cuenta++;
-            pin = lv_textarea_get_text(txt_codigo);
+            pin = get_codigo_text();
             if (!pin.equals(last_pin)) {
                 last_pin = pin;
                 cuenta = 0;
@@ -1026,7 +933,7 @@ void task_main(lv_timer_t *timer) {
                     keypad_done = 0;
                     configuring = 0;
                     state = IDLE;
-                    lv_scr_load(scr_main);
+                    load_scr_main();
                     break;
                 }
                 if (read_code.equals(NVS.getString("sec.code"))) {
@@ -1036,13 +943,13 @@ void task_main(lv_timer_t *timer) {
                 }
                 keypad_request("Código incorrecto");
                 keypad_done = 0;
-                lv_textarea_set_text(txt_codigo, "");
+                set_codigo_text("");
             }
             break;
         case CONFIG_SCREEN:
             if (configuring == 0) {
                 state = IDLE;
-                lv_scr_load(scr_main);
+                load_scr_main();
             }
     }
 }
@@ -1113,19 +1020,6 @@ void config_request() {
     lv_scr_load(scr_config);
 }
 
-void config_lock_request() {
-    read_code = "";
-    keypad_request("Introduzca código de administración");
-}
-
-void keypad_request(const char *mensaje) {
-    keypad_requested = 0;
-    keypad_done = 0;
-    read_code = "";
-    set_estado_codigo(mensaje);
-    lv_textarea_set_text(txt_codigo, "");
-    lv_scr_load(scr_codigo);
-}
 
 time_t actualiza_hora() {
     const char *dia_semana[] = {"Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"};
@@ -1165,37 +1059,53 @@ void setup() {
     initialize_flash();
 
     // Inicializar bus SPI y el TFT conectado a través de él
+    Serial.println("Inicializando SPI");
     SPI.begin();
+    Serial.println("Inicializando TFT");
     tft.begin();            /* Inicializar TFT */
     tft.setRotation(3);     /* Orientación horizontal */
 
     // Inicializar lector
+    Serial.println("Inicializando RFID");
     mfrc522.PCD_Init();
 
     // Inicializar GUI
+    Serial.println("Inicializando GUI");
     initialize_gui();
 
     // Inicializar subsistema HTTP
+    Serial.println("Inicializando HTTP");
     initialize_http_client();
 
     // Inicializar subsistema musical
+    Serial.println("Inicializando MelodyPlayer");
     initialize_melody_player();
 
     // Crear pantallas y cambiar a la pantalla de arranque
     keypad_requested = 0;
+
+    Serial.println("Creando pantalla splash");
     create_scr_splash();
+    Serial.println("Creando pantalla main");
     create_scr_main();
+    Serial.println("Creando pantalla check");
     create_scr_check();
+    Serial.println("Creando pantalla login");
     create_scr_login();
+    Serial.println("Creando pantalla selection");
     create_scr_selection();
+    Serial.println("Creando pantalla config");
     create_scr_config();
+    Serial.println("Creando pantalla codigo");
     create_scr_codigo();
 
     // Inicializar WiFi
+    Serial.println("Inicializando Wi-Fi");
     set_estado_splash_format("Conectando a %s...", NVS.getString("net.wifi_ssid").c_str());
     WiFi.begin(NVS.getString("net.wifi_ssid").c_str(), NVS.getString("net.wifi_psk").c_str());
 
     // Comenzar la conexión a la red
+    Serial.println("Creando tarea Wi-Fi");
     lv_timer_create(task_wifi_connection, 100, nullptr);
 }
 
@@ -1219,13 +1129,15 @@ void initialize_flash() {
         cookieCPP_puntToken = NVS.getString("CPP-puntToken");
     } else {
         Serial.println("Borrando flash...");
-        NVS.eraseAll(true);
+        NVS.eraseAll(false);
         NVS.setInt("PUNTO_CONTROL", 3);
         NVS.setString("CPP-authToken", "");
         NVS.setString("CPP-puntToken", "");
         // configuración por defecto de la WiFi
         NVS.setString("net.wifi_ssid", PUNTO_CONTROL_SSID_PREDETERMINADO);
         NVS.setString("net.wifi_psk", PUNTO_CONTROL_PSK_PREDETERMINADA);
+        Serial.println("Flash inicializada...");
+        NVS.commit();
     }
 }
 
@@ -1272,6 +1184,7 @@ void initialize_gui() {
 
         // Guardar datos de calibración
         NVS.setBlob("CalData", (uint8_t *) calData, sizeof(calData));
+        NVS.commit();
     }
 
     tft.setTouch(calData);
@@ -1337,24 +1250,10 @@ static void ta_select_form_event_cb(lv_event_t *e) {
         // los datos de usuario contienen el código del punto de control
         punto = (char *) lv_event_get_user_data(e);
         set_estado_splash("Activando punto de acceso en Séneca");
-        lv_scr_load(scr_splash);
+        load_scr_splash();
     }
     if (code == LV_EVENT_DELETE) {
         lv_mem_free(lv_event_get_user_data(e));
-    }
-}
-
-static void ta_config_click_event_cb(lv_event_t *e) {
-    lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_CLICKED) {
-        configuring = 1;
-    }
-}
-
-static void ta_keypad_click_event_cb(lv_event_t *e) {
-    lv_event_code_t code = lv_event_get_code(e);
-    if (code == LV_EVENT_CLICKED) {
-        keypad_requested = 1;
     }
 }
 
@@ -1514,58 +1413,6 @@ static void btn_logout_event_cb(lv_event_t *e) {
     }
 }
 
-static void btn_numpad_event_cb(lv_event_t *e) {
-    lv_event_code_t code = lv_event_get_code(e);
-    lv_obj_t *obj = lv_event_get_target(e);
-    lv_obj_t *txt = (lv_obj_t *) (lv_event_get_user_data(e));
-
-    if (code == LV_EVENT_DRAW_PART_BEGIN) {
-        lv_obj_draw_part_dsc_t *dsc = (lv_obj_draw_part_dsc_t *) lv_event_get_param(e);
-        dsc->label_dsc->font = &mulish_24;
-
-        if (dsc->id == 10) {
-            if (lv_btnmatrix_get_selected_btn(obj) == dsc->id) {
-                dsc->rect_dsc->bg_color = lv_palette_darken(LV_PALETTE_RED, 3);
-            } else {
-                dsc->rect_dsc->bg_color = lv_palette_main(LV_PALETTE_RED);
-            }
-            dsc->label_dsc->color = lv_color_white();
-        }
-        if (dsc->id == 13) {
-            if (lv_btnmatrix_get_selected_btn(obj) == dsc->id) {
-                dsc->rect_dsc->bg_color = lv_palette_darken(LV_PALETTE_GREEN, 3);
-            } else {
-                dsc->rect_dsc->bg_color = lv_palette_main(LV_PALETTE_GREEN);
-            }
-            dsc->label_dsc->color = lv_color_white();
-        }
-    }
-    if (code == LV_EVENT_VALUE_CHANGED) {
-        uint32_t id = lv_btnmatrix_get_selected_btn(obj);
-        const char *btn = lv_btnmatrix_get_btn_text(obj, id);
-        switch (id) {
-            case 10:
-                read_code = "";
-                keypad_done = 1;
-                break;
-            case 11:
-                lv_textarea_set_password_mode(txt, !lv_textarea_get_password_mode(txt));
-                lv_textarea_cursor_left(txt);
-                lv_textarea_cursor_right(txt);
-                break;
-            case 12:
-                lv_textarea_del_char(txt);
-                break;
-            case 13:
-                read_code = lv_textarea_get_text(txt);
-                keypad_done = 1;
-                break;
-            default:
-                lv_textarea_add_char(txt, btn[0]);
-        }
-    }
-}
-
 void create_scr_calibracion() {
     scr_calibracion = lv_obj_create(nullptr);
     lv_obj_set_style_bg_color(scr_calibracion, LV_COLOR_MAKE(255, 255, 255), LV_PART_MAIN);
@@ -1579,125 +1426,6 @@ void create_scr_calibracion() {
     lv_label_set_long_mode(lbl_calibracion, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(lbl_calibracion, SCREEN_WIDTH * 9 / 10);
     lv_obj_align(lbl_calibracion, LV_ALIGN_CENTER, 0, 0);
-}
-
-void create_scr_splash() {
-    // CREAR PANTALLA DE ARRANQUE (splash screen)
-    scr_splash = lv_obj_create(nullptr);
-    lv_obj_set_style_bg_color(scr_splash, LV_COLOR_MAKE(255, 255, 255), LV_PART_MAIN);
-
-    // Logo de la CED centrado
-    LV_IMG_DECLARE(logo_ced)
-    lv_obj_t *img = lv_img_create(scr_splash);
-    lv_img_set_src(img, &logo_ced);
-    lv_obj_align(img, LV_ALIGN_CENTER, 0, 0);
-
-    // Spinner para indicar operación en progreso en la esquina inferior derecha
-    spinner_splash = lv_spinner_create(scr_splash, 1000, 45);
-    lv_obj_set_size(spinner_splash, 50, 50);
-    lv_obj_align(spinner_splash, LV_ALIGN_BOTTOM_RIGHT, -10, -10);
-
-    // Etiqueta de estado actual centrada en la parte superior
-    lbl_estado_splash = lv_label_create(scr_splash);
-    lv_obj_set_style_text_font(lbl_estado_splash, &mulish_24, LV_PART_MAIN);
-    lv_obj_set_style_text_align(lbl_estado_splash, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-    set_estado_splash("Inicializando...");
-
-    // Etiqueta de dirección IP actual centrada en la parte inferior
-    lbl_ip_splash = lv_label_create(scr_splash);
-    lv_obj_set_style_text_font(lbl_ip_splash, &mulish_16, LV_PART_MAIN);
-    lv_obj_set_style_text_align(lbl_ip_splash, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-    set_ip_splash("Esperando configuración");
-
-    // Etiqueta de versión del software en la esquina inferior izquierda
-    lbl_version_splash = lv_label_create(scr_splash);
-    lv_obj_set_style_text_font(lbl_version_splash, &mulish_16, LV_PART_MAIN);
-    lv_obj_set_style_text_align(lbl_version_splash, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
-    lv_obj_set_style_text_color(lbl_version_splash, lv_palette_main(LV_PALETTE_BLUE_GREY), LV_PART_MAIN);
-    lv_label_set_text(lbl_version_splash, PUNTO_CONTROL_VERSION);
-    lv_obj_align(lbl_version_splash, LV_ALIGN_BOTTOM_LEFT, 10, -10);
-
-    btn_config_splash = create_config_button(scr_splash);
-    lv_obj_add_flag(btn_config_splash, LV_OBJ_FLAG_HIDDEN);
-}
-
-void create_scr_main() {
-    // CREAR PANTALLA PRINCIPAL
-    scr_main = lv_obj_create(nullptr);
-    lv_obj_set_style_bg_color(scr_main, LV_COLOR_MAKE(255, 255, 255), LV_PART_MAIN);
-
-    // Etiqueta con el nombre del punto de acceso en la parte superior
-    lbl_nombre_main = lv_label_create(scr_main);
-    lv_label_set_text(lbl_nombre_main, "Punto de control WiFi");
-    lv_obj_set_style_text_font(lbl_nombre_main, &mulish_16, LV_PART_MAIN);
-    lv_obj_set_style_text_color(lbl_nombre_main, lv_palette_main(LV_PALETTE_DEEP_ORANGE), LV_PART_MAIN);
-    lv_obj_set_style_text_align(lbl_nombre_main, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-    lv_label_set_long_mode(lbl_nombre_main, LV_LABEL_LONG_SCROLL_CIRCULAR);
-
-    // Etiqueta de hora y fecha actual centrada justo debajo
-    lbl_hora_main = lv_label_create(scr_main);
-    lv_obj_set_style_text_font(lbl_hora_main, &mulish_64_numbers, LV_PART_MAIN);
-    lv_obj_set_style_text_align(lbl_hora_main, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-    lbl_fecha_main = lv_label_create(scr_main);
-    lv_obj_set_style_text_font(lbl_fecha_main, &mulish_24, LV_PART_MAIN);
-    lv_obj_set_style_text_color(lbl_fecha_main, lv_palette_main(LV_PALETTE_GREY), LV_PART_MAIN);
-    lv_obj_set_style_text_align(lbl_fecha_main, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-    set_hora_main("");
-    set_fecha_main("");
-
-    // Etiqueta de estado centrada en pantalla
-    lbl_estado_main = lv_label_create(scr_main);
-    lv_obj_set_style_text_font(lbl_estado_main, &mulish_32, LV_PART_MAIN);
-    lv_obj_set_style_text_color(lbl_estado_main, lv_palette_main(LV_PALETTE_BLUE_GREY), LV_PART_MAIN);
-    lv_obj_set_style_text_align(lbl_estado_main, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-    set_estado_main("");
-
-    // Imagen de la flecha en la parte inferior
-    lbl_icon_main = lv_label_create(scr_main);
-    lv_obj_set_style_text_font(lbl_icon_main, &symbols, LV_PART_MAIN);
-    set_icon_text(lbl_icon_main, "\uF063", LV_PALETTE_BLUE, 1, 0);
-
-    // Icono de configuración
-    create_config_button(scr_main);
-
-    // Icono de teclado
-    lv_obj_t *btn_keypad_main = lv_btn_create(scr_main);
-    lv_obj_t *lbl = lv_label_create(btn_keypad_main);
-    lv_obj_set_style_bg_opa(btn_keypad_main, LV_OPA_TRANSP, LV_PART_MAIN);
-    lv_obj_set_style_text_font(lbl, &mulish_32, LV_PART_MAIN);
-    lv_label_set_text(lbl, LV_SYMBOL_KEYBOARD);
-    lv_obj_set_style_text_color(lbl, lv_palette_main(LV_PALETTE_INDIGO), LV_PART_MAIN);
-    lv_obj_align(btn_keypad_main, LV_ALIGN_BOTTOM_RIGHT, -10, -10);
-    lv_obj_add_event_cb(btn_keypad_main, ta_keypad_click_event_cb, LV_EVENT_CLICKED, scr_main);
-    lv_obj_add_event_cb(scr_main, ta_keypad_click_event_cb, LV_EVENT_CLICKED, scr_main);
-
-    // Código QR
-    qr_main = lv_qrcode_create(scr_main, 170, lv_color_hex3(0x0), lv_color_hex3(0xfff));
-    lv_qrcode_update(qr_main, "", 0);
-    //qr_main = lv_label_create(scr_main);
-    //lv_label_set_text(qr_main, "Hola");
-    lv_obj_align(qr_main, LV_ALIGN_BOTTOM_MID, 0, -15);
-    lv_obj_add_flag(qr_main, LV_OBJ_FLAG_HIDDEN);
-}
-
-void create_scr_check() {
-    // CREAR PANTALLA DE COMPROBACIÓN
-    scr_check = lv_obj_create(nullptr);
-    lv_obj_set_style_bg_color(scr_check, LV_COLOR_MAKE(255, 255, 255), LV_PART_MAIN);
-
-    // Icono del estado de comprobación
-    lbl_icon_check = lv_label_create(scr_check);
-    lv_obj_set_style_text_font(lbl_icon_check, &symbols, LV_PART_MAIN);
-    set_icon_text(lbl_icon_check, "\uF252", LV_PALETTE_BLUE, 0, 0);
-
-    // Etiqueta de estado de comprobación
-    lbl_estado_check = lv_label_create(scr_check);
-    lv_obj_set_style_text_font(lbl_estado_check, &mulish_32, LV_PART_MAIN);
-    lv_obj_set_style_text_color(lbl_estado_check, lv_palette_main(LV_PALETTE_BLUE_GREY), LV_PART_MAIN);
-    lv_obj_set_style_text_align(lbl_estado_check, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-    lv_label_set_long_mode(lbl_estado_check, LV_LABEL_LONG_WRAP);
-    lv_obj_set_width(lbl_estado_check, SCREEN_WIDTH * 9 / 10);
-    set_estado_check("");
 }
 
 void create_scr_login() {
@@ -2048,49 +1776,6 @@ void create_scr_selection() {
     lv_obj_align(pnl_selection, LV_ALIGN_TOP_MID, 0, 0);
 }
 
-void create_scr_codigo() {
-    scr_codigo = lv_obj_create(nullptr);
-    lv_obj_set_style_bg_color(scr_codigo, LV_COLOR_MAKE(255, 255, 255), LV_PART_MAIN);
-
-    static const char *botones[] = {"1", "2", "3", "4", "5", "\n",
-                                    "6", "7", "8", "9", "0", "\n",
-                                    LV_SYMBOL_CLOSE, LV_SYMBOL_EYE_CLOSE, LV_SYMBOL_BACKSPACE, "Enviar", ""};
-
-    txt_codigo = lv_textarea_create(scr_codigo);
-
-    // Etiqueta de información
-    lbl_estado_codigo = lv_label_create(scr_codigo);
-    lv_obj_set_style_text_font(lbl_estado_codigo, &mulish_32, LV_PART_MAIN);
-    lv_obj_set_style_text_color(lbl_estado_codigo, lv_palette_main(LV_PALETTE_BLUE_GREY), LV_PART_MAIN);
-    lv_obj_set_style_text_align(lbl_estado_codigo, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-    lv_label_set_long_mode(lbl_estado_codigo, LV_LABEL_LONG_SCROLL_CIRCULAR);
-    lv_obj_set_width(lbl_estado_codigo, lv_pct(100));
-    set_estado_codigo("");
-
-    // Campo de código
-    lv_obj_set_style_text_font(txt_codigo, &mulish_64_numbers, LV_PART_MAIN);
-    lv_obj_set_style_text_color(txt_codigo, lv_palette_main(LV_PALETTE_INDIGO), LV_PART_MAIN);
-    lv_textarea_set_align(txt_codigo, LV_TEXT_ALIGN_CENTER);
-    lv_textarea_set_one_line(txt_codigo, true);
-    lv_textarea_set_password_mode(txt_codigo, true);
-    lv_obj_set_style_border_width(txt_codigo, 0, LV_PART_MAIN);
-    lv_obj_set_width(txt_codigo, lv_pct(100));
-    lv_obj_add_state(txt_codigo, LV_STATE_FOCUSED);
-
-    // Teclado numérico
-    lv_obj_t *btn_matrix_numeros = lv_btnmatrix_create(scr_codigo);
-    lv_btnmatrix_set_map(btn_matrix_numeros, botones);
-    lv_btnmatrix_set_btn_width(btn_matrix_numeros, 13, 2);
-    lv_btnmatrix_set_btn_ctrl(btn_matrix_numeros, 11, LV_BTNMATRIX_CTRL_CHECKABLE);
-    lv_obj_align(btn_matrix_numeros, LV_ALIGN_CENTER, 0, 0);
-    lv_obj_add_event_cb(btn_matrix_numeros, btn_numpad_event_cb, LV_EVENT_ALL, txt_codigo);
-    lv_obj_set_width(btn_matrix_numeros, lv_pct(100));
-    lv_obj_set_height(btn_matrix_numeros, LV_VER_RES / 2 + 25);
-    lv_obj_align(btn_matrix_numeros, LV_ALIGN_BOTTOM_MID, 0, 0);
-    lv_obj_clear_flag(btn_matrix_numeros, LV_OBJ_FLAG_CLICK_FOCUSABLE);
-
-    lv_obj_align_to(txt_codigo, btn_matrix_numeros, LV_ALIGN_OUT_TOP_MID, 0, 0);
-}
 
 void update_scr_config() {
     lv_textarea_set_text(txt_ssid_config, NVS.getString("net.wifi_ssid").c_str());
