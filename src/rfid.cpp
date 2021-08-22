@@ -17,20 +17,42 @@
 // along with Foobar.  If not, see <https://www.gnu.org/licenses/>.
 //
 
-#ifndef ESP32_PUNTO_WIFI_SCR_SHARED_H
-#define ESP32_PUNTO_WIFI_SCR_SHARED_H
-
 #include <Arduino.h>
-#include <lvgl.h>
+#include <SPI.h>
+#include <MFRC522.h>
 
-void ta_config_click_event_cb(lv_event_t *e);
-void ta_keypad_click_event_cb(lv_event_t *e);
-void ta_kb_form_event_cb(lv_event_t *e);
-lv_obj_t *create_config_button(lv_obj_t *parent);
-void set_icon_text(lv_obj_t *label, const char *text, lv_palette_t color, int bottom, int offset);
+#include "rfid.h"
+#include "notify.h"
 
-void create_keyboard(lv_obj_t *parent);
-void hide_keyboard();
-void show_keyboard();
+MFRC522 mfrc522(RFID_SDA_PIN, RFID_RST_PIN);
 
-#endif //ESP32_PUNTO_WIFI_SCR_SHARED_H
+void initialize_rfid() {
+    mfrc522.PCD_Init();
+}
+
+bool rfid_new_card_detected() {
+    return mfrc522.PICC_IsNewCardPresent();
+}
+String read_id() {
+    String uidS;
+
+    if (mfrc522.PICC_IsNewCardPresent()) {
+        notify_check_start();
+
+        if (mfrc522.PICC_ReadCardSerial()) {
+            uint32_t uid = (uint32_t) (
+                    mfrc522.uid.uidByte[0] +
+                    (mfrc522.uid.uidByte[1] << 8) +
+                    (mfrc522.uid.uidByte[2] << 16) +
+                    (mfrc522.uid.uidByte[3] << 24));
+
+            uidS = (String) uid;
+
+            while (uidS.length() < 10) {
+                uidS = "0" + uidS;
+            }
+        }
+        mfrc522.PICC_HaltA();
+    }
+    return uidS;
+}

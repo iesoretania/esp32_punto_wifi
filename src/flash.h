@@ -17,26 +17,20 @@
 // along with Foobar.  If not, see <https://www.gnu.org/licenses/>.
 //
 
-#ifndef ESP32_PUNTO_WIFI_SCR_MAIN_H
-#define ESP32_PUNTO_WIFI_SCR_MAIN_H
+#ifndef ESP32_PUNTO_WIFI_FLASH_H
+#define ESP32_PUNTO_WIFI_FLASH_H
 
-#include <lvgl.h>
+#include <Arduino.h>
 
-void create_scr_main();
-void load_scr_main();
-int is_loaded_scr_main();
+void initialize_flash();
 
-void set_nombre_main(const char *string);
-void set_hora_main(const char *string);
-void set_fecha_main(const char *string);
-void set_estado_main(const char *string);
-void set_icon_text_main(const char *text, lv_palette_t color, int bottom, int offset);
-void hide_main_icon();
-void show_main_icon();
-void hide_main_estado();
-void show_main_estado();
-void hide_main_qr();
-void show_main_qr();
-void update_main_qrcode(const char *code, int length);
+String flash_get_string(String key);
+uint64_t flash_get_int(String key);
+bool flash_get_blob(String key, uint8_t *data, size_t length);
+bool flash_set_string(String key, String data);
+bool flash_set_int(String key, uint64_t data);
+bool flash_set_blob(String key, uint8_t *data, size_t length);
+bool flash_erase(String key);
+bool flash_commit();
 
-#endif //ESP32_PUNTO_WIFI_SCR_MAIN_H
+#endif //ESP32_PUNTO_WIFI_FLASH_H

@@ -26,7 +26,6 @@ static lv_obj_t *txt_codigo;
 
 String read_code;
 int keypad_requested = 0;
-int configuring = 0;
 int keypad_done = 0;
 
 void btn_numpad_event_cb(lv_event_t *e) {
