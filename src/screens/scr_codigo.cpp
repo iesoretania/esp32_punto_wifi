@@ -28,6 +28,18 @@ String read_code;
 int keypad_requested = 0;
 int keypad_done = 0;
 
+String get_read_code() {
+    return read_code;
+}
+
+void reset_read_code() {
+    read_code = "";
+}
+
+void set_read_code(String s) {
+    read_code = s;
+}
+
 void btn_numpad_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
     lv_obj_t *obj = lv_event_get_target(e);

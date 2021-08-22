@@ -23,6 +23,7 @@
 #define SCREEN_WIDTH TFT_HEIGHT
 #define SCREEN_HEIGHT TFT_WIDTH
 
+void initialize_gui();
 void display_set_brightness(uint64_t brillo);
 
 #endif //ESP32_PUNTO_WIFI_DISPLAY_H

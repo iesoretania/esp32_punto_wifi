@@ -34,7 +34,7 @@ int send_seneca_request_data(String &body);
 void seneca_process_token(String uid);
 String seneca_process_json_response();
 String seneca_get_qrcode_string(time_t now);
-void seneca_login(String usuario, String password);
+void seneca_login(String &usuario, String &password);
 
 HttpRequestStatus seneca_get_request_status();
 int seneca_get_http_status_code();

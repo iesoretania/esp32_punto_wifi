@@ -22,8 +22,6 @@
 
 #include <Arduino.h>
 
-extern String read_code;
-
 extern int keypad_requested;
 extern int configuring;
 extern int keypad_done;
@@ -35,5 +33,9 @@ void set_estado_codigo(const char *string);
 
 void set_codigo_text(const char *txt);
 const char *get_codigo_text();
+
+String get_read_code();
+void reset_read_code();
+void set_read_code(String s);
 
 #endif //ESP32_PUNTO_WIFI_SCR_CODIGO_H

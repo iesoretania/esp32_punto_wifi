@@ -22,7 +22,6 @@
 #include <punto_control.h>
 
 #include <lvgl.h>
-#include <SPI.h>
 #include <WiFi.h>
 #include <lwip/apps/sntp.h>
 
@@ -31,7 +30,6 @@
 #include "notify.h"
 #include "rfid.h"
 #include "display.h"
-#include "screens/scr_shared.h"
 #include "screens/scr_splash.h"
 #include "screens/scr_main.h"
 #include "screens/scr_check.h"
@@ -40,15 +38,11 @@
 #include "screens/scr_selection.h"
 #include "screens/scr_config.h"
 
-void initialize_gui();
-
 void task_main(lv_timer_t *);
 
 time_t actualiza_hora();
 
 void config_request();
-
-void config_lock_request();
 
 void task_wifi_connection(lv_timer_t *timer) {
     static enum {
@@ -200,19 +194,19 @@ void task_wifi_connection(lv_timer_t *timer) {
             break;
         case CONFIG_SCREEN_LOCK:
             if (keypad_done == 1) {
-                if (read_code.isEmpty()) {
+                if (get_read_code().isEmpty()) {
                     keypad_done = 0;
                     configuring = 0;
                     state = CONNECTING;
                     load_scr_splash();
                     break;
                 }
-                if (read_code.equals(flash_get_string("sec.code"))) {
+                if (get_read_code().equals(flash_get_string("sec.code"))) {
                     config_request();
                     state = CONFIG_SCREEN;
                     break;
                 }
-                read_code = "";
+                reset_read_code();
                 set_estado_codigo("Código incorrecto");
                 keypad_done = 0;
 
@@ -232,10 +226,10 @@ void task_wifi_connection(lv_timer_t *timer) {
                 keypad_done = 0;
                 // si se ha leído un llavero, simular la introducción del código
                 if (!uidS.isEmpty()) {
-                    read_code = uidS;
+                    set_read_code(uidS);
                 }
-                if (!read_code.isEmpty()) {
-                    old_code = read_code;
+                if (!get_read_code().isEmpty()) {
+                    old_code = get_read_code();
                     keypad_request("Confirme código");
                     state = CONFIG_CODE_2;
                 }
@@ -248,15 +242,15 @@ void task_wifi_connection(lv_timer_t *timer) {
                 keypad_done = 0;
                 // si se ha leído un llavero, simular la introducción del código
                 if (!uidS.isEmpty()) {
-                    read_code = uidS;
+                    set_read_code(uidS);
                 }
-                if (!read_code.isEmpty()) {
-                    if (old_code.equals(read_code)) {
-                        flash_set_string("sec.code", read_code);
+                if (!get_read_code().isEmpty()) {
+                    if (old_code.equals(get_read_code())) {
+                        flash_set_string("sec.code", get_read_code());
                         flash_commit();
                         load_scr_splash();
                         state = CONNECTING;
-                        read_code = "";
+                        reset_read_code();
                     } else {
                         keypad_request("Los códigos no coinciden. Vuelva a escribir el código");
                         state = CONFIG_CODE_1;
@@ -271,11 +265,11 @@ void task_wifi_connection(lv_timer_t *timer) {
                 keypad_done = 0;
                 // si se ha leído un llavero, simular la introducción del código
                 if (!uidS.isEmpty()) {
-                    read_code = uidS;
+                    set_read_code(uidS);
                 }
-                if (read_code.equals(flash_get_string("sec.code"))) {
+                if (get_read_code().equals(flash_get_string("sec.code"))) {
                     state = CONNECTING;
-                    read_code = "";
+                    reset_read_code();
                     load_scr_splash();
                     break;
                 }
@@ -296,7 +290,6 @@ void task_main(lv_timer_t *timer) {
     static String last_pin = "";
     static String pin = "";
     static String uidS;
-    static uint32_t otp;
     static time_t last_now = 0;
 
     switch (state) {
@@ -334,9 +327,9 @@ void task_main(lv_timer_t *timer) {
                 load_scr_main();
             } else {
                 int llavero;
-                if (!read_code.isEmpty()) {
-                    uidS = read_code;
-                    read_code = "";
+                if (!get_read_code().isEmpty()) {
+                    uidS = get_read_code();
+                    reset_read_code();
                     llavero = 0;
                 } else {
                     uidS = read_id();
@@ -451,16 +444,16 @@ void task_main(lv_timer_t *timer) {
             uidS = read_id();
             if (keypad_done == 1 || !uidS.isEmpty()) {
                 if (!uidS.isEmpty()) {
-                    read_code = uidS;
+                    set_read_code(uidS);
                 }
-                if (read_code.isEmpty()) {
+                if (get_read_code().isEmpty()) {
                     keypad_done = 0;
                     configuring = 0;
                     state = IDLE;
                     load_scr_main();
                     break;
                 }
-                if (read_code.equals(flash_get_string("sec.code"))) {
+                if (get_read_code().equals(flash_get_string("sec.code"))) {
                     config_request();
                     state = CONFIG_SCREEN;
                     break;
@@ -479,7 +472,7 @@ void task_main(lv_timer_t *timer) {
 }
 
 void config_request() {
-    read_code = "";
+    reset_read_code();
     update_scr_config();
     load_scr_config();
 }
@@ -524,7 +517,6 @@ void setup() {
 
     // Inicializar bus SPI y el TFT conectado a través de él
     Serial.println("Inicializando SPI");
-    SPI.begin();
 
     // Inicializar lector
     Serial.println("Inicializando RFID");

@@ -46,7 +46,7 @@ String cookieJSESSIONID;
 String cookieSenecaP;
 
 // Estado del parser XML
-String modo, punto, xCentro, nombre_punto, tipo_acceso, nuevo_punto, usuario;
+String modo, punto, xCentro, nombre_punto, tipo_acceso, nuevo_punto, last_usuario;
 
 TinyXML xml;
 uint8_t xmlBuffer[2048];
@@ -503,7 +503,7 @@ String seneca_get_tipo_acceso() {
 String seneca_process_json_response() {
     if (response.indexOf("<correcto>SI") > -1) {
         // es correcta, volver a cargar página principal del punto de acceso con nueva cookie
-        String param = "_MODO_=" + modo + "&USUARIO=" + usuario + "&CLAVE_P=";
+        String param = "_MODO_=" + modo + "&USUARIO=" + last_usuario + "&CLAVE_P=";
         response = "";
         send_seneca_request_data(param);
         return "";
@@ -521,11 +521,13 @@ String seneca_get_qrcode_string(time_t now) {
     return String("AUTHKEY=" + String(otp) + "|X_PUNACCCONTPRE=" + punto_id);
 }
 
-void seneca_login(String usuario, String password) {
+void seneca_login(String &usuario, String &password) {
     // La autenticación de Séneca convierte cada carácter del password a su código ASCII y se concatenan
     // El resultado es el número al que se aplica el cifrado RSA
     String clave_convertida = "";
     const char *ptr = password.c_str();
+
+    last_usuario = usuario;
 
     while (*ptr) {
         clave_convertida += (int) (*ptr);
