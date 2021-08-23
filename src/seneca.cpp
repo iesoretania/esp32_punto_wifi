@@ -31,6 +31,11 @@
 #include "screens/scr_check.h"
 #include "screens/scr_selection.h"
 
+// ATENCIÓN: El código es muy "chapucero" aunque funciona bien mientras el Equipo de Séneca no toque nada
+// desde el lado servidor
+//
+// No se refactorizará porque en breve "una API is coming!"
+
 byte punto_key[80];
 int base32_key_length;
 
@@ -67,6 +72,9 @@ int seneca_get_http_status_code() {
     return http_status_code;
 }
 
+/***
+ * Séneca trabaja con ISO-8859-1 mientras que lo demás espera UTF-8
+ */
 String iso_8859_1_to_utf8(String &str) {
     String strOut;
     for (int i = 0; i < str.length(); i++) {
@@ -81,6 +89,10 @@ String iso_8859_1_to_utf8(String &str) {
     return strOut;
 }
 
+/**
+ * Envía una petición a Séneca montando las cookies y las cabeceras necesarias
+ * Si "body" está vacío, será una petición GET. Será POST si contiene algo
+*/
 int send_seneca_data(String &body) {
     // preparar cookies de petición
     String http_cookie = "";
@@ -137,18 +149,27 @@ int send_seneca_data(String &body) {
     return r;
 }
 
+/**
+ * Selecciona la URL de login y envía la información
+ */
 int send_seneca_login_data(String &body) {
     esp_http_client_set_url(http_client, PUNTO_CONTROL_LOGIN_URL);
 
     return send_seneca_data(body);
 }
 
+/**
+ * Selecciona la URL del punto de control y envía la información
+ */
 int send_seneca_request_data(String &body) {
     esp_http_client_set_url(http_client, PUNTO_CONTROL_URL);
 
     return send_seneca_data(body);
 }
 
+/**
+ * Procesar la respuesta del punto de control (sólo para esa URL, cuidado)
+ */
 int parse_seneca_response() {
     int ok = 0;
 
@@ -156,7 +177,7 @@ int parse_seneca_response() {
         // petición exitosa, extraer mensaje con la respuesta
         int index, index2;
 
-        // la respuesta está dentro de una etiqueta <strong>, no me lo cambiéis :)
+        // la respuesta del picaje está dentro de una etiqueta <strong>, no me lo cambiéis :)
         index = response.indexOf("<strong>");
         if (index > 0) {
             index2 = response.indexOf("</strong>");
@@ -190,10 +211,12 @@ int parse_seneca_response() {
                 ok = 1; // éxito
             }
         } else {
+            // no hay etiqueta <strong>. Algo no hemos hecho bien
             set_icon_text_check("\uF071", LV_PALETTE_ORANGE, 0, 0);
             set_estado_check("Se ha obtenido una respuesta desconocida desde Séneca.");
         }
     } else {
+        // no se ha devuelto un código 200
         set_icon_text_check("\uF071", LV_PALETTE_ORANGE, 0, 0);
         set_estado_check("Ha ocurrido un error en la comunicación con Séneca.");
     }
@@ -201,6 +224,9 @@ int parse_seneca_response() {
     return ok; // 0 = error
 }
 
+/**
+ * Gestiona la petición HTTP en curso. Es necesario para interceptar las cookies que envía Séneca
+ */
 esp_err_t http_event_handle(esp_http_client_event_t *evt) {
     String cookie_value, cookie_name, tmp;
     int index;
@@ -210,6 +236,7 @@ esp_err_t http_event_handle(esp_http_client_event_t *evt) {
             http_request_status = HTTP_ERROR;
             break;
             case HTTP_EVENT_ON_HEADER:
+                // vienen cookies
                 if (strcmp(evt->header_key, "Set-Cookie") == 0) {
                     cookie_name = evt->header_value;
                     index = cookie_name.indexOf('=');
@@ -230,6 +257,10 @@ esp_err_t http_event_handle(esp_http_client_event_t *evt) {
                         }
                         if (cookie_name.equals("CPP-authToken")) {
                             cookieCPP_authToken = cookie_value;
+                            // si no existe en la flash, almacenar su valor en flash
+                            // TODO: cambia continuamente, pero su validez es muy larga (hablamos de años)
+                            //  aún así sería interesante actualizarla una vez al día o cada semana para no
+                            //  gastar la flash en lugar de ignorar los cambios como hacemos ahora
                             tmp = flash_get_string("CPP-authToken");
                             if (tmp.length() == 0) {    // actualizar en flash solamente si no existe
                                 flash_set_string("CPP-authToken", cookieCPP_authToken);
@@ -238,6 +269,7 @@ esp_err_t http_event_handle(esp_http_client_event_t *evt) {
                         }
                         if (cookie_name.equals("CPP-puntToken")) {
                             cookieCPP_puntToken = cookie_value;
+                            // si no existe en la flash o ha cambiado, almacenar su valor en flash
                             tmp = flash_get_string("CPP-puntToken");
                             if (tmp.length() == 0 || !tmp.equals(cookieCPP_puntToken)) {
                                 flash_set_string("CPP-puntToken", cookieCPP_puntToken);
@@ -247,20 +279,29 @@ esp_err_t http_event_handle(esp_http_client_event_t *evt) {
                     }
                 }
                 break;
-                case HTTP_EVENT_ON_DATA:
-                    response += String((char *) evt->data).substring(0, evt->data_len);
-                    break;
-                    case HTTP_EVENT_ON_FINISH:
-                        http_request_status = HTTP_DONE;
-                        http_status_code = esp_http_client_get_status_code(evt->client);
-                        break;
-                        default:
-                            http_request_status = HTTP_ERROR;
-                            break;
+            case HTTP_EVENT_ON_DATA:
+                // concatenamos el bloque de datos recibidos a lo que ya teníamos
+                response += String((char *) evt->data).substring(0, evt->data_len);
+                break;
+            case HTTP_EVENT_ON_FINISH:
+                // acabó la petición, almacenar el código de respuesta e indicar que estamos listos
+                http_request_status = HTTP_DONE;
+                http_status_code = esp_http_client_get_status_code(evt->client);
+                break;
+            default:
+                // uy, algo no esperado: error
+                http_request_status = HTTP_ERROR;
+                break;
     }
     return ESP_OK;
 }
 
+/**
+ * Codificar usando RSA un número m dado (cadena ASCII con número en decimal) con los e y n dados
+ * usando el coprocesador criptográfico
+ *
+ * r = m^e mod n
+ */
 String seneca_cifrar_rsa(const char *cadena, const char *e, const char *n) {
     char buffer[100];
     size_t buffer_len;
@@ -284,21 +325,30 @@ String seneca_cifrar_rsa(const char *cadena, const char *e, const char *n) {
     return String(buffer);
 }
 
+/**
+ * Calcula el OTP necesario para el código QR. Se deriva de una parte de un hash criptográfico SHA1
+ * cuya clave es distinta para cada punto de control (almacenada en punto_key previamente) y que se
+ * aplica a la hora actual en una granularidad de 30 segundos
+ */
 uint32_t seneca_calcula_otp(time_t now) {
     byte hmacResult[20];
     byte payload[8] = { 0 };
+
+    // configurar contexto
     mbedtls_md_context_t ctx;
     mbedtls_md_type_t md_type = MBEDTLS_MD_SHA1;
     const size_t payload_length = 8;
 
     size_t key_length = base32_key_length * 5 / 8;
 
+    // cambiar el timestamp a una granularidad de 30 segundos y almacenarlo en 4 bytes al final del payload
     now /= 30;
     payload[7] = now & 0xFF;
     payload[6] = (now >> 8) & 0xFF;
     payload[5] = (now >> 16) & 0xFF;
     payload[4] = (now >> 24) & 0xFF;
 
+    // obtener el HMAC SHA1 del payload con la clave del punto de acceso previamente configurada
     mbedtls_md_init(&ctx);
     mbedtls_md_setup(&ctx, mbedtls_md_info_from_type(md_type), 1);
     mbedtls_md_hmac_starts(&ctx, (const unsigned char *) punto_key, key_length);
@@ -306,8 +356,11 @@ uint32_t seneca_calcula_otp(time_t now) {
     mbedtls_md_hmac_finish(&ctx, hmacResult);
     mbedtls_md_free(&ctx);
 
+    // extraer los 4 bits menos significativos del hash. Eso nos dará el offset del hash a partir
+    // del cual sacaremos los 4 bytes que necesitamos
     int offset = hmacResult[19] & 0xF;
 
+    // obtener los 4 bytes desde el offset en un entero de 32 bits
     uint32_t otp = hmacResult[offset];
     otp = (otp << 8) + hmacResult[offset + 1];
     otp = (otp << 8) + hmacResult[offset + 2];
@@ -315,9 +368,14 @@ uint32_t seneca_calcula_otp(time_t now) {
 
     otp = otp & 0x7fffffff;
 
+    // devolver los últimos 6 dígitos de su representación en decimal: es el parámetro que irá en el
+    // código QR junto con el número de punto de control
     return otp % 1000000;
 }
 
+/**
+ * Cumplimenta la clave del punto de acceso a partir de su representación en BASE32
+ */
 void seneca_set_clave_punto(char *pos_inicio) {
     char clave_punto[81] = { 0 };
     const char base32[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
@@ -356,7 +414,10 @@ void seneca_prepare_request() {
     http_status_code = 0;
 }
 
-
+/**
+ * Parser del HTML devuelto por Séneca. Tiene muchos hacks porque el código HTML de Séneca no es XML puro
+ * (etiquetas sin cerrar o atributos que tienen el igual con whitespaces en medio)
+ */
 void xml_html_callback(uint8_t statusflags, char *tagName, uint16_t tagNameLen, char *data, uint16_t dataLen) {
     // nos quedamos con las etiquetas <h1> y <a>
     if ((statusflags & STATUS_END_TAG) && strstr(tagName, "h1")) {
@@ -414,6 +475,9 @@ void xml_html_callback(uint8_t statusflags, char *tagName, uint16_t tagNameLen, 
     }
 }
 
+/**
+ * Inicializa el cliente asíncrono HTTP
+ */
 void initialize_seneca() {
     http_config.event_handler = http_event_handle;
     http_config.url = PUNTO_CONTROL_URL;
@@ -423,6 +487,9 @@ void initialize_seneca() {
     http_request_status = HTTP_IDLE;
 }
 
+/**
+ * Formulario POST del punto de control de presencia para enviar un código
+ */
 void seneca_process_token(String uid) {
     // enviar token a Séneca
     String params =
@@ -445,6 +512,9 @@ String seneca_get_punto() {
     return punto;
 }
 
+/**
+ *
+ */
 void process_seneca_response() {
     modo = "";
     punto = "";
@@ -463,12 +533,11 @@ void process_seneca_response() {
     char *pos = strstr(cadena, "|X_PUNACCCONTPRE=");
     if (pos) {
         pos += 17;
-        int punto_id = 0;
+        punto_id = 0;
         while (*pos >= '0' && *pos <= '9') {
             punto_id = punto_id * 10 + (*pos - '0');
             pos++;
         }
-        seneca_set_punto_id(punto_id);
 
         // Clave del punto de control (para generar QR)
         pos = strstr(cadena, "base32ToHex('");
@@ -500,6 +569,9 @@ String seneca_get_tipo_acceso() {
     return tipo_acceso;
 }
 
+/**
+ * Procesar respuesta JSON del login
+ */
 String seneca_process_json_response() {
     if (response.indexOf("<correcto>SI") > -1) {
         // es correcta, volver a cargar página principal del punto de acceso con nueva cookie
@@ -521,9 +593,12 @@ String seneca_get_qrcode_string(time_t now) {
     return String("AUTHKEY=" + String(otp) + "|X_PUNACCCONTPRE=" + punto_id);
 }
 
+/**
+ * Proceso de "logueo" en Séneca para obtener las cookies de sesión
+ */
 void seneca_login(String &usuario, String &password) {
-    // La autenticación de Séneca convierte cada carácter del password a su código ASCII y se concatenan
-    // El resultado es el número al que se aplica el cifrado RSA
+    // la autenticación de Séneca convierte cada carácter del password a su código ASCII y se concatenan
+    // el resultado es el número al que se aplica el cifrado RSA con las claves fijas dadas
     String clave_convertida = "";
     const char *ptr = password.c_str();
 
