@@ -45,6 +45,8 @@ time_t actualiza_hora();
 void config_request();
 
 void task_wifi_connection(lv_timer_t *timer) {
+    // Esta tarea es la primera en ejecutarse al arrancar el punto de acceso.
+    // Se ejecuta en segundo plano cada 100 ms y es una máquina de estados:
     static enum {
         INIT, CONNECTING, NTP_START, NTP_WAIT, CHECKING, CHECK_WAIT, CHECK_RETRY, LOGIN_SCREEN, WAITING,
         CONFIG_SCREEN_LOCK, CONFIG_SCREEN, CONFIG_CODE_1, CONFIG_CODE_2, CODE_WAIT, DONE
@@ -62,35 +64,53 @@ void task_wifi_connection(lv_timer_t *timer) {
 
     switch (state) {
         case DONE:
+            // fin de la tarea: eliminar temporizador
             lv_timer_del(timer);
             return;
         case INIT:
+            // estado inicial:
+            // lo primero es comprobar si hay código de administración. Si no existe, solicitamos su creación
             if (flash_get_string("sec.code").isEmpty()) {
                 state = CONFIG_CODE_1;
                 keypad_request("Creación del código de administración");
                 break;
             } else {
+                // si existe código, comprobamos si hay código de activación. En ese caso, esperamos a que se
+                // introduzca correctamente antes de seguir
                 if (flash_get_int("sec.force_code")) {
                     state = CODE_WAIT;
                     keypad_request("Active el punto con el código de administración");
                     break;
                 }
+                // si no hay código de activación, mostramos la pantalla de carga y pasamos al estado de conexión
                 state = CONNECTING;
                 load_scr_splash();
             }
         case CONNECTING:
+            // nos aseguramos que el indicador de carga está visible
             show_splash_spinner();
+
+            // si se ha pulsado el botón de configuración, pasar a la pantalla correspondiente
+            // NOTA: el botón aparece transcurridos 10 segundos sin haber completado la conexión a la red
             if (configuring) {
                 config_request();
                 state = CONFIG_SCREEN;
                 break;
             }
+
+            // comprobar estado de conexión a la Wi-Fi
+            // si acabamos de conectarnos, comenzar puesta en hora
             if (WiFi.status() == WL_CONNECTED) {
                 state = NTP_START;
                 set_ip_splash_format("IP: %s", WiFi.localIP().toString().c_str());
                 set_estado_splash("Comprobando conectividad Andared...");
+
+                // intentamos resolver "c0" por DNS. Si tiene éxito, suponemos que estamos conectados
+                // a la red corporativa desde un centro educativo y usamos como servidor NTP c0.
+                // De otra forma, la salida a Internet del servicio será bloqueada por el cortafuegos
                 code = WiFi.hostByName("c0", ip);
             } else {
+                // aún no hay conexión. Llevar la cuenta de las décimas de segundo que estamos así
                 cuenta++;
                 // si a los 10 segundos no nos hemos conectado, cambiar el número de versión por el icono de config.
                 if (cuenta % 100 == 0) {
@@ -100,52 +120,77 @@ void task_wifi_connection(lv_timer_t *timer) {
             }
             break;
         case NTP_START:
+            // ocultar icono de configuración por si estuviera visible
             hide_splash_config();
             set_estado_splash("Ajustando hora...");
+            // ajustamos la zona horaria según la cadena de configuración
             setenv("TZ", PUNTO_CONTROL_HUSO_HORARIO, 1);
             tzset();
+            // modo de operación SNTP: poll unicast
             sntp_setoperatingmode(SNTP_OPMODE_POLL);
+            // si ha fallado la resolución DNS antes, usar el servidor NTP del pool español
+            // si no ha fallado, usar c0 como servidor NTP
             if (code != 1) {
                 sntp_setservername(0, (char *) PUNTO_CONTROL_NTP_SERVER);
             } else {
                 sntp_setservername(0, (char *) "c0");
             }
+            // inicializar SNTP para poner el reloj interno en hora
             sntp_init();
             state = NTP_WAIT;
             break;
         case NTP_WAIT:
+            // comprobar si ya estamos en hora. En ese caso, pasar al estado de comprobación de conectividad
             if (sntp_get_sync_status() == SNTP_SYNC_STATUS_COMPLETED) {
                 state = CHECKING;
                 cuenta = 0;
             }
             break;
         case CHECKING:
+            // estado de comprobación de conectividad
             set_estado_splash("Comprobando acceso a Séneca...");
+
+            // mandaremos una petición "vacía" a la aplicación de control de presencia de Séneca
+            // que servirá para comprobar si tenemos acceso y, de paso, obtener algunos parámetros
+            // de configuración
             seneca_prepare_request();
 
+            // si el punto de control está seleccionado, enviamos el código PIN 0
+            // si no lo está, enviamos un formulario vacío
             if (!seneca_get_punto().isEmpty()) {
                 seneca_process_token("0");
             } else {
                 send_seneca_request_data(empty_body);
             }
 
+            // pasamos al estado donde esperamos la respuesta
             state = CHECK_WAIT;
             break;
         case CHECK_WAIT:
+            // esperar hasta obtener la respuesta
             if (seneca_get_request_status() == HTTP_ONGOING) {
                 break;
             }
+            // aquí estaremos cuando haya finalizado la petición a Séneca
+
+            // si ha ocurrido algún error con la petición, pasar al estado de reintentar
             if (seneca_get_request_status() != HTTP_DONE || seneca_get_http_status_code() != 200) {
                 set_estado_splash("Error de acceso. Reintentando");
                 state = CHECK_RETRY;
             } else {
+                // no ha habido error, procesar respuesta para obtener todos los datos posibles
                 set_estado_splash("Acceso a Séneca confirmado");
                 process_seneca_response();
+
+                // si "tipo de acceso" contiene algo, es que con las cookies estamos "logueados"
                 if (seneca_get_tipo_acceso().isEmpty()) {
                     if (!seneca_get_punto().isEmpty()) {
+                        // si está configurado el punto de acceso, ya estamos listos: indicamos que todo
+                        // bien durante unos segundos y pasamos de pantalla
                         state = WAITING;
                         hide_splash_spinner();
                     } else {
+                        // si no está configurado el punto de acceso, pasar el control a la pantalla de selección
                         state = LOGIN_SCREEN;
                         load_scr_selection();
                     }
@@ -158,18 +203,24 @@ void task_wifi_connection(lv_timer_t *timer) {
             cuenta = 0;
             break;
         case CHECK_RETRY:
+            // ha ocurrido un error al acceder a Séneca, esperamos un segundo y lo volvemos a intentar
             cuenta++;
             if (cuenta == 10) {
                 state = CHECKING;
             }
             break;
         case LOGIN_SCREEN:
+            // en el momento que estemos en la splash screen, es que ya estamos en condiciones de comprobar
+            // la conectividad
             if (is_loaded_scr_splash()) {
                 cuenta = 0;
                 state = CHECKING;
             }
+            // si hemos terminado la petición de login, procesarla para ver si ha tenido éxito
             if (seneca_get_request_status() == HTTP_DONE) {
-                // procesar respuesta JSON del login
+                // procesar respuesta JSON del login:
+                // devuelve una cadena vacía si está correcto, en caso contrario una cadena con el mensaje
+                // de error devuelto
                 String res = seneca_process_json_response();
 
                 if (res.length() > 0) {
@@ -182,10 +233,14 @@ void task_wifi_connection(lv_timer_t *timer) {
             }
             break;
         case WAITING:
+            // estado final en el que esperamos dos segundos para mostrar el mensaje de que estamos conectados
             cuenta++;
             if (cuenta == 20) {
+                // notificar acústicamente que estamos listos
                 notify_ready();
 
+                // acabamos nuestra función: cargar pantalla principal, liberar los recursos de la splash screen
+                // y crear la tarea principal que lleva la lógica del fichaje
                 state = DONE;
                 load_scr_main();
                 clean_scr_splash();
@@ -193,7 +248,12 @@ void task_wifi_connection(lv_timer_t *timer) {
             }
             break;
         case CONFIG_SCREEN_LOCK:
+            // cuando estamos en este estado, estamos esperando a que se introduzca el código
+            // de administración para acceder a la pantalla de configuración
+
+            // ¿se ha dado a enviar en la pantalla de introducción del código?
             if (keypad_done == 1) {
+                // si no se ha introducido el código, volver al estado de conexión a la red
                 if (get_read_code().isEmpty()) {
                     keypad_done = 0;
                     configuring = 0;
@@ -201,11 +261,13 @@ void task_wifi_connection(lv_timer_t *timer) {
                     load_scr_splash();
                     break;
                 }
+                // si se ha introducido un código y es el correcto, pasar a la pantalla de configuración
                 if (get_read_code().equals(flash_get_string("sec.code"))) {
                     config_request();
                     state = CONFIG_SCREEN;
                     break;
                 }
+                // si el código es incorrecto, indicarlo y seguir como estábamos
                 reset_read_code();
                 set_estado_codigo("Código incorrecto");
                 keypad_done = 0;
@@ -214,13 +276,19 @@ void task_wifi_connection(lv_timer_t *timer) {
             }
             break;
         case CONFIG_SCREEN:
+            // permanecemos en este estado mientras está abierta la pantalla de configuración
+
+            // si la hemos cerrado, volver a la pantalla y al estado de conexión a la red
             if (!configuring) {
                 load_scr_splash();
                 state = CONNECTING;
             }
             break;
         case CONFIG_CODE_1:
-            // ver si hay algún llavero
+            // estamos configurando el código de administrador
+            // en este estado lo leeremos la primera vez
+
+            // comprobar si hay algún llavero
             uidS = read_id();
             if (keypad_done || !uidS.isEmpty()) {
                 keypad_done = 0;
@@ -229,6 +297,7 @@ void task_wifi_connection(lv_timer_t *timer) {
                     set_read_code(uidS);
                 }
                 if (!get_read_code().isEmpty()) {
+                    // pasamos al estado de comprobación del segundo código
                     old_code = get_read_code();
                     keypad_request("Confirme código");
                     state = CONFIG_CODE_2;
@@ -236,7 +305,10 @@ void task_wifi_connection(lv_timer_t *timer) {
             }
             break;
         case CONFIG_CODE_2:
-            // ver si hay algún llavero
+            // aquí se comprueba la introducción del código de administración por segunda vez
+            // para ver si coincide con el primero
+
+            // comprobar si hay algún llavero
             uidS = read_id();
             if (keypad_done || !uidS.isEmpty()) {
                 keypad_done = 0;
@@ -245,13 +317,16 @@ void task_wifi_connection(lv_timer_t *timer) {
                     set_read_code(uidS);
                 }
                 if (!get_read_code().isEmpty()) {
+                    // ¿coinciden?
                     if (old_code.equals(get_read_code())) {
+                        // sí: almacenar en flash y volver al estado de conexión a la red
                         flash_set_string("sec.code", get_read_code());
                         flash_commit();
                         load_scr_splash();
                         state = CONNECTING;
                         reset_read_code();
                     } else {
+                        // no: volver al estado de introducción del primer código
                         keypad_request("Los códigos no coinciden. Vuelva a escribir el código");
                         state = CONFIG_CODE_1;
                     }
@@ -259,7 +334,9 @@ void task_wifi_connection(lv_timer_t *timer) {
             }
             break;
         case CODE_WAIT:
-            // ver si hay algún llavero
+            // en este estado estamos esperando la introducción del código de activación del lector
+
+            // comprobar si hay algún llavero o se ha introducido un código por teclado
             uidS = read_id();
             if (keypad_done || !uidS.isEmpty()) {
                 keypad_done = 0;
@@ -267,12 +344,15 @@ void task_wifi_connection(lv_timer_t *timer) {
                 if (!uidS.isEmpty()) {
                     set_read_code(uidS);
                 }
+                // ¿coincide con el código de activación grabado?
                 if (get_read_code().equals(flash_get_string("sec.code"))) {
+                    // sí: pasamos al estado de comprobación de red
                     state = CONNECTING;
                     reset_read_code();
                     load_scr_splash();
                     break;
                 }
+                // no: mostramos mensaje de error y seguimos esperando a que introduzca el correcto
                 keypad_request("Código incorrecto");
                 keypad_done = 0;
                 set_codigo_text("");
@@ -282,6 +362,8 @@ void task_wifi_connection(lv_timer_t *timer) {
 }
 
 void task_main(lv_timer_t *timer) {
+    // Esta tarea es la que gestiona la lógica de la gestión de presencia.
+    // Se ejecuta en segundo plano cada 100 ms y es una máquina de estados:
     static enum {
         DONE, IDLE, CARD_PRESENT, CHECK_ONGOING, CHECK_RESULT_WAIT, CONFIG_SCREEN_LOCK, CONFIG_SCREEN, NO_NETWORK
     } state = IDLE;
