@@ -23,7 +23,7 @@
 #include <Arduino.h>
 
 void initialize_rfid();
-String read_id();
+String rfid_read_id();
 bool rfid_new_card_detected();
 
 #endif //ESP32_PUNTO_WIFI_RFID_H

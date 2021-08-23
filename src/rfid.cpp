@@ -33,7 +33,7 @@ void initialize_rfid() {
 bool rfid_new_card_detected() {
     return mfrc522.PICC_IsNewCardPresent();
 }
-String read_id() {
+String rfid_read_id() {
     String uidS;
 
     if (mfrc522.PICC_IsNewCardPresent()) {

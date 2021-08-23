@@ -93,6 +93,7 @@ void btn_numpad_event_cb(lv_event_t *e) {
 }
 
 void create_scr_codigo() {
+    keypad_requested = 0;
     scr_codigo = lv_obj_create(nullptr);
     lv_obj_set_style_bg_color(scr_codigo, LV_COLOR_MAKE(255, 255, 255), LV_PART_MAIN);
 

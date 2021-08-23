@@ -289,7 +289,7 @@ void task_wifi_connection(lv_timer_t *timer) {
             // en este estado lo leeremos la primera vez
 
             // comprobar si hay algún llavero
-            uidS = read_id();
+            uidS = rfid_read_id();
             if (keypad_done || !uidS.isEmpty()) {
                 keypad_done = 0;
                 // si se ha leído un llavero, simular la introducción del código
@@ -309,7 +309,7 @@ void task_wifi_connection(lv_timer_t *timer) {
             // para ver si coincide con el primero
 
             // comprobar si hay algún llavero
-            uidS = read_id();
+            uidS = rfid_read_id();
             if (keypad_done || !uidS.isEmpty()) {
                 keypad_done = 0;
                 // si se ha leído un llavero, simular la introducción del código
@@ -337,7 +337,7 @@ void task_wifi_connection(lv_timer_t *timer) {
             // en este estado estamos esperando la introducción del código de activación del lector
 
             // comprobar si hay algún llavero o se ha introducido un código por teclado
-            uidS = read_id();
+            uidS = rfid_read_id();
             if (keypad_done || !uidS.isEmpty()) {
                 keypad_done = 0;
                 // si se ha leído un llavero, simular la introducción del código
@@ -376,17 +376,25 @@ void task_main(lv_timer_t *timer) {
 
     switch (state) {
         case DONE:
+            // en este estado acabamos, aunque no debería ocurrir nunca porque ésta es la tarea final
             lv_timer_del(timer);
             return;
         case IDLE:
+            // estado principal
+            // indicar que ha transcurrido un tick (100 ms)
             cuenta++;
+
+            // ¿se ha pedido ir a la pantalla de configuración?
             if (configuring) {
+                // sí: pedir código de administrador
                 config_lock_request();
                 state = CONFIG_SCREEN_LOCK;
                 cuenta = 0;
                 break;
             }
-            if (is_loaded_scr_main()) {
+            // si no estamos en la pantalla principal es que estamos en alguna pantalla de introducción
+            // de código. Transcurridos 8 segundos sin cambios en el texto introducido, salimos de la pantalla
+            if (!is_loaded_scr_main()) {
                 pin = get_codigo_text();
                 if (!pin.equals(last_pin)) {
                     last_pin = pin;
@@ -395,54 +403,77 @@ void task_main(lv_timer_t *timer) {
                 // si a los 8 segundos no ha habido ningún cambio, cerrar pantalla de introducción de PIN
                 if (cuenta > 80) load_scr_main();
             }
+            // si han pulsado en el display, mostrar pantalla de introducción de PIN
             if (keypad_requested) {
                 keypad_request("Introduzca PIN");
                 cuenta = 0;
                 last_pin = "";
             }
+            // si ya no estamos conectados a la red Wi-Fi, mostrar un mensaje indicándolo y cambiar de estado
             if (WiFi.status() != WL_CONNECTED) {
+                // mostramos un icono rojo indicando problemas y ocultamos el código QR
+                // TODO: aunque no haya red el QR sigue siendo válido, deberíamos dejarlo visible y actualizado todo
+                //  el rato aunque eso implique fusionar los estados para no duplicar código
                 set_icon_text_main("\uF252", LV_PALETTE_RED, 1, 0);
                 show_main_estado();
                 show_main_icon();
                 hide_main_qr();
                 state = NO_NETWORK;
+                // cambiar a la pantalla principal aunque estemos en
                 load_scr_main();
             } else {
-                int llavero;
+                // estamos en el caso normal
+                int llavero; // 0 = PIN; 1 = código leído del llavero
+
+                // ¿se ha introducido un código por teclado?
                 if (!get_read_code().isEmpty()) {
+                    // sí: leerlo
                     uidS = get_read_code();
                     reset_read_code();
                     llavero = 0;
                 } else {
-                    uidS = read_id();
+                    // no: leer el ID del llavero actual por RFID (si hay)
+                    uidS = rfid_read_id();
                     llavero = 1;
                 }
 
+                // ¡hay un código para enviar!
                 if (!uidS.isEmpty()) {
+                    // indicar que estamos contactando con Séneca
                     set_icon_text_check("\uF252", LV_PALETTE_TEAL, 0, 0);
                     if (llavero) {
                         set_estado_check("Llavero detectado. Comunicando con Séneca, espere por favor...");
                     } else {
                         set_estado_check("Enviando PIN a Séneca, espere por favor...");
                     }
+                    // cargar a la pantalla de comprobación y cambiar de estado
                     load_scr_check();
                     state = CARD_PRESENT;
                     cuenta = 0;
                     break;
                 } else {
+                    // si el teclado se ha cerrado, volver a la pantalla principal
                     if (keypad_done) {
                         load_scr_main();
                         keypad_done = 0;
                     }
                 }
 
+                // actualizar el texto de la hora que aparece en pantalla
                 time_t now = actualiza_hora();
 
+                // si es la primera vez que entramos o estamos en el segundo 0 o 30, actualizar código QR
                 if (last_now == 0 || now / 30 != last_now) {
                     last_now = now / 30;
                     uidS = seneca_get_qrcode_string(now);
                     update_main_qrcode(uidS.c_str(), uidS.length());
                 }
+
+                // dependiendo del tiempo transcurrido mostramos u ocultamos información
+                // la secuencia se repite cada 10 segundos:
+                //    Segundo 1: Se muestra "Acerque llavero" y se oculta QR
+                //    Segundo 6: Se muestra "Pulse pantalla para PIN" y se oculta QR
+                //    Resto    : Se oculta el mensaje y se muestra el QR
                 switch ((cuenta / 10) % 10) {
                     case 0:
                         show_main_estado();
@@ -464,23 +495,34 @@ void task_main(lv_timer_t *timer) {
             }
             break;
         case CARD_PRESENT:
+            // hay un código que procesar, enviar petición a Séneca
             seneca_process_token(uidS);
             cuenta = 0;
             state = CHECK_ONGOING;
             break;
         case CHECK_ONGOING:
+            // estamos esperando respuesta de Séneca
             if (seneca_get_request_status() == HTTP_ONGOING) {
+                // aún no hay nada, salir
                 break;
             }
+            // ya tenemos respuesta
             if (seneca_get_request_status() == HTTP_DONE && seneca_get_http_status_code() == 200) {
+                // ¿ha tenido éxito? Si es así, procesar la respuesta y obtener toda la información que podamos
                 process_seneca_response();
+                // dependiendo del resultado, mostrar un mensaje u otro
+                // TODO: es mejor que la función devuelva el resultado y hacer todos los cambios en las pantallas
+                //  aquí en lugar de allí
                 parse_seneca_response();
                 cuenta = 0;
                 state = CHECK_RESULT_WAIT;
             } else {
-                if (cuenta == 150) {
+                // no ha tenido éxito, hacer otra petición transcurrido un segundo
+                if (cuenta >= 150) {
+                    // se han hecho 15 intentos, desistir de intentarlo
                     set_icon_text_check("\uF071", LV_PALETTE_RED, 0, 0);
                     set_estado_check("Desisto. No se ha podido notificar a Séneca. Fiche de nuevo.");
+                    notify_check_error();
                     cuenta = 0;
                     state = CHECK_RESULT_WAIT;
                     break;
@@ -494,6 +536,8 @@ void task_main(lv_timer_t *timer) {
             }
             break;
         case CHECK_RESULT_WAIT:
+            // aquí se espera para mostrar el resultado del fichaje (bien sea correcto o un error)
+            // pasados 4 segundos se cierra, o tras 2 si se acerca otro llavero
             cuenta++;
             if (cuenta > 40 || (cuenta > 20 && rfid_new_card_detected())) {
                 state = IDLE;
@@ -501,20 +545,27 @@ void task_main(lv_timer_t *timer) {
             }
             break;
         case NO_NETWORK:
+            // no hay red, indicarlo
             cuenta++;
             actualiza_hora();
             set_estado_main("NO HAY RED, ESPERE...");
             if (WiFi.status() == WL_CONNECTED) {
+                // ¡ha vuelto la red!
                 set_icon_text_main("\uF063", LV_PALETTE_BLUE, 1, 0);
                 state = IDLE;
             } else {
+                // pasados 2 segundos, intentar forzar la reconexión (no se hace automáticamente)
                 if (cuenta % 20 == 0) {
                     WiFi.reconnect();
                 }
             }
             break;
         case CONFIG_SCREEN_LOCK:
+            // en este estado estamos esperando que se introduzca el código de administrador que da acceso
+            // a la configuración
             cuenta++;
+
+            // se cierra automáticamente a los 8 segundos sin cambios
             pin = get_codigo_text();
             if (!pin.equals(last_pin)) {
                 last_pin = pin;
@@ -523,11 +574,17 @@ void task_main(lv_timer_t *timer) {
             // si a los 8 segundos no ha habido ningún cambio, cerrar pantalla de introducción de código
             if (cuenta > 80) keypad_done = 1;
 
-            uidS = read_id();
+            // comprobar si hay llavero. Su ID puede usarse de código de administración
+            uidS = rfid_read_id();
+
+            // se ha cerrado el teclado o se ha leído un llavero: procesar
             if (keypad_done == 1 || !uidS.isEmpty()) {
                 if (!uidS.isEmpty()) {
+                    // hay un llavero, copiar su ID en el valor leído por teclado
                     set_read_code(uidS);
                 }
+                // si no hay código es que se ha cerrado el teclado sin introducir ninguno, volver a la pantalla
+                // principal
                 if (get_read_code().isEmpty()) {
                     keypad_done = 0;
                     configuring = 0;
@@ -535,17 +592,21 @@ void task_main(lv_timer_t *timer) {
                     load_scr_main();
                     break;
                 }
+                // comprobar si el código introducido coincide con el configurado
                 if (get_read_code().equals(flash_get_string("sec.code"))) {
+                    // sí: cambiar a la pantalla de configuración
                     config_request();
                     state = CONFIG_SCREEN;
                     break;
                 }
+                // no: indicarlo y permitir volver a intentarlo
                 keypad_request("Código incorrecto");
                 keypad_done = 0;
                 set_codigo_text("");
             }
             break;
         case CONFIG_SCREEN:
+            // configurando. Esperar aquí hasta que se cierre la pantalla, entonces pasamos a la principal
             if (configuring == 0) {
                 state = IDLE;
                 load_scr_main();
@@ -558,7 +619,6 @@ void config_request() {
     update_scr_config();
     load_scr_config();
 }
-
 
 time_t actualiza_hora() {
     const char *dia_semana[] = {"Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"};
@@ -589,16 +649,9 @@ void setup() {
     // Inicializar puerto serie (para mensajes de depuración)
     Serial.begin(115200);
 
-    // Activar iluminación del display al 100%
-    pinMode(BACKLIGHT_PIN, OUTPUT);
-    ledcAttachPin(BACKLIGHT_PIN, 2);
-    ledcSetup(2, 5000, 8);
-
     // Inicializar flash
+    Serial.println("Inicializando Flash");
     initialize_flash();
-
-    // Inicializar bus SPI y el TFT conectado a través de él
-    Serial.println("Inicializando SPI");
 
     // Inicializar lector
     Serial.println("Inicializando RFID");
@@ -615,8 +668,6 @@ void setup() {
     notify_start();
 
     // Crear pantallas y cambiar a la pantalla de arranque
-    keypad_requested = 0;
-
     Serial.println("Creando pantalla splash");
     create_scr_splash();
     Serial.println("Creando pantalla main");

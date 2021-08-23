@@ -62,6 +62,11 @@ void espi_touch_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data) {
 }
 
 void initialize_gui() {
+    // activar iluminación del display al 100%
+    pinMode(BACKLIGHT_PIN, OUTPUT);
+    ledcAttachPin(BACKLIGHT_PIN, 2);
+    ledcSetup(2, 5000, 8);
+
     // recuperar brillo de pantalla
     display_set_brightness(flash_get_int("scr.brightness"));
 
