@@ -27,6 +27,7 @@
 MFRC522 mfrc522(RFID_SDA_PIN, RFID_RST_PIN);
 
 void initialize_rfid() {
+    SPI.begin();
     mfrc522.PCD_Init();
 }
 
