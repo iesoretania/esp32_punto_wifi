@@ -22,7 +22,7 @@
 #include <melody_player.h>
 #include <melody_factory.h>
 
-MelodyPlayer player(BUZZER_PIN, LOW);
+MelodyPlayer player(BUZZER_PIN, 0, LOW);
 
 void notify_start() {
     const char* init_melody = "init:d=4,o=6,b=200: 8c, 4g";
