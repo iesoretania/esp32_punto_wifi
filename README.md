@@ -30,16 +30,19 @@ que puede encontrarse en muchos sitios a precios asequibles.
 
 El ESP32 es sólo una pieza de todo el sistema: estará conectado a una pantalla táctil, a un lector de tarjetas RFID y a un zumbador.
 
-* La pantalla táctil mostrará información relevante al usuario, tal como la hora o el código
-  QR para fichar, permitirá la configuración del sistema e incluso la introducción un código PIN.
+1. La pantalla táctil mostrará información relevante al usuario, tal como la hora o el código
+   QR para fichar, permitirá la configuración del sistema e incluso la introducción un código PIN.
+   * `3.5" 480*320 SPI Serial TFT LCD Module Display Screen with Touch Panel. Driver ILI9488`
 
-* El lector RFID permitirá usar llaveros o tarjetas. El diseño actual sólo soporta la tecnología
-  de 13.56 MHz, pero se trabajará en permitir etiquetas de 125 kHz con cambios menores en el
-  hardware en un futuro próximo.
+2. El lector RFID permitirá usar llaveros o tarjetas. El diseño actual sólo soporta la tecnología
+   de 13.56 MHz, pero se trabajará en permitir etiquetas de 125 kHz con cambios menores en el
+   hardware en un futuro próximo.
+   * `RC522 Antenna RFID SPI IC Wireless Module`
 
-* El zumbador, o buzzer, proporcionará una respuesta acústica a cada acción de fichaje.
+3. El zumbador, o buzzer, proporcionará una respuesta acústica a cada acción de fichaje.
+   * `3.3V Passive Buzzer`
 
-Todo estará interconectado con una placa de circuito impreso o PCB. Más abajo se enlazará
+4. Todo lo anterior estará interconectado con una placa de circuito impreso o PCB. Más abajo se enlazará
 a una propuesta de diseño lista para descargar.
 
 Por último, el sistema necesita una caja. Se propone un diseño personalizable en formato SCAD
@@ -58,7 +61,70 @@ En principio parece ser que tendremos una API específica para acceder a esta fu
 Con ella, todos los "hacks" que hemos implementado podrán ser eliminados del código
 otorgando más fiabilidad y soporte a medio plazo.
 
-Descarga de recursos
+Cómo cargar el firmware en una placa ESP32-DevKitC
+--------------------------------------------------
+### Obligatorio salvo en Linux: Instalación de drivers USB
+Independientemente del método a utilizar, para programar el dispositivo es necesario que los controladores
+USB estén correctamente instalados en el sistema operativo.
+
+Descárgalos e instálalos desde [este enlace](https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers).
+
+Puedes probar estos enlaces directos, aunque pueden dejar de funcionar en cualquier momento (si fuera el caso,
+usa el enlace anterior):
+- Windows: [CP210x Universal Windows Driver v10.1.10](https://www.silabs.com/documents/public/software/CP210x_Universal_Windows_Driver.zip)
+- macOS: [CP210x VCP Mac OSX Driver v6.0.1](https://www.silabs.com/documents/public/software/Mac_OSX_VCP_Driver.zip)
+- Linux: Los kernel 3.x y superiores deberían detectar el controlador automáticamente
+
+### MÉTODO A. Sencillo, bajo Windows ejecutando _ExpressIF Flash Download Tools_
+*ATENCIÓN: Guía en progreso, próximamente se incluirán capturas de pantalla*
+
+Esta opción no necesita instalar nada en el PC, simplemente bajar un software programador y 4 ficheros que contienen
+el firmware del ESP32.
+
+#### 1. Ficheros .bin
+En la sección [Releases](https://github.com/iesoretania/esp32_punto_wifi/releases) de este repositorio
+podrás descargar dos de los ficheros que usaremos: `firmware.bin` y `partitions.bin`
+
+También son necesarios los siguientes dos ficheros (haz clic en los nombres para ir a la página de descarga
+y selecciona `Download`):
+- [`boot_app0.bin`](https://github.com/espressif/arduino-esp32/blob/master/tools/partitions/boot_app0.bin)
+- [`bootloader_dio_40m.bin`](https://github.com/espressif/arduino-esp32/blob/master/tools/sdk/esp32/bin/bootloader_dio_40m.bin)
+
+#### 2. Software de programación
+
+Descarga el programa [Flash Download Tools](https://www.espressif.com/en/support/download/other-tools) desde el enlace.
+
+#### 3. Instalación del firmware
+- Conecta el puerto MicroUSB del ESP32-DevKitC con un cable USB al PC. Deberá encenderse una luz roja en la placa
+- Abre el programa `flash_download_tool.exe`
+- Selecciona el botón `ESP32 DownloadTool` y asegúrate de que la pestaña `SPIDownload` está seleccionada
+- Con los botones de puntos suspensivos ("`...`") selecciona cada uno de los cuatro ficheros .bin descargados antes.
+El orden es indistinto
+- Es importante que junto a cada fichero escribas estas direcciones correctamente detrás de la arroba (@):
+
+  | Fichero                  | Posición    |
+  |--------------------------|-------------|
+  | `bootloader_dio_40m.bin` | @`0x1000`   |
+  | `partitions.bin`         | @`0x8000`   |
+  | `boot_app0.bin`          | @`0xe000`   |
+  | `firmware.bin`           | @`0x10000`  |
+
+- No cambies nada de las otras opciones y pulsa el botón "START"
+  * Si no te detecta el dispositivo, prueba a dejar pulsado el botón `BOOT` que hay en la placa del ESP32 DevKit-C
+  hasta que comience la transferencia
+- Cuando aparezca el mensaje "FINISH 完成" puedes cerrar el programa y desconectar el dispositivo
+
+### MÉTODO B: Avanzado. Bajo Windows, Linux o macOS usando _PlatformIO_
+- Instala [PlatformIO Core (CLI)](https://docs.platformio.org/en/latest/core/installation.html#system-requirements)
+- Clona este repositorio
+- Conecta el conector MicroUSB del ESP32-DevKitC al PC mediante un cable USB
+- Entra en el directorio del repositorio y ejecuta `pio run -t upload`
+  * Si no detecta el comando `pio`, cierra la terminal y vuelve a abrirla para actualizar el PATH
+- Espera a que termine la compilación y comenzará la subida (upload)
+  * Si no te detecta el dispositivo (sale la secuencia `...---...` hasta fallar), prueba a dejar pulsado
+  el botón `BOOT` que hay en la placa ESP32 DevKit-C hasta que comience la subida (un porcentaje que se incrementa)
+
+Otros recursos
 --------------------
-Este repositorio sólo contiene el código fuente del firmware. Puedes descargar la última
-versión de los ficheros del proyecto desde [este enlace](https://drive.google.com/drive/folders/19vDfP-dDWeiWx2o5_p8hLuGxcC6yYe33?usp=sharing).
+Este repositorio sólo contiene el código fuente del firmware. Puedes descargar otros
+ficheros del proyecto desde [este enlace](https://drive.google.com/drive/folders/19vDfP-dDWeiWx2o5_p8hLuGxcC6yYe33?usp=sharing).
