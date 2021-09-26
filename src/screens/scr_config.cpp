@@ -25,6 +25,7 @@
 #include "display.h"
 #include "scr_config.h"
 #include "scr_shared.h"
+#include "notify.h"
 
 static lv_obj_t *scr_config;     // Pantalla de configuración
 static lv_obj_t *txt_ssid_config;
@@ -82,6 +83,7 @@ static void btn_config_event_cb(lv_event_t *e) {
             // deshacer cambios
             display_set_brightness(flash_get_int("scr.brightness"));
         }
+        notify_button_press();
         configuring = 0;
     }
 }

@@ -58,3 +58,15 @@ void notify_check_error() {
     Melody melody = MelodyFactory.loadRtttlString(card_melody);
     player.playAsync(melody);
 }
+
+void notify_key_press() {
+    const char* card_melody = "card:d=16,o=5,b=200: 32c";
+    Melody melody = MelodyFactory.loadRtttlString(card_melody);
+    player.playAsync(melody);
+}
+
+void notify_button_press() {
+    const char* card_melody = "card:d=16,o=5,b=200: 16e";
+    Melody melody = MelodyFactory.loadRtttlString(card_melody);
+    player.playAsync(melody);
+}

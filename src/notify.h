@@ -26,5 +26,7 @@ void notify_check_start();
 void notify_check_success_in();
 void notify_check_success_out();
 void notify_check_error();
+void notify_key_press();
+void notify_button_press();
 
 #endif //ESP32_PUNTO_WIFI_NOTIFY_H

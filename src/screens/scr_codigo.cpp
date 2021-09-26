@@ -19,6 +19,7 @@
 
 #include <lvgl.h>
 #include "scr_codigo.h"
+#include "notify.h"
 
 static lv_obj_t *scr_codigo;     // Pantalla de introducción de código manual
 static lv_obj_t *lbl_estado_codigo;
@@ -73,21 +74,26 @@ void btn_numpad_event_cb(lv_event_t *e) {
             case 10:
                 read_code = "";
                 keypad_done = 1;
+                notify_button_press();
                 break;
-                case 11:
-                    lv_textarea_set_password_mode(txt, !lv_textarea_get_password_mode(txt));
-                    lv_textarea_cursor_left(txt);
-                    lv_textarea_cursor_right(txt);
-                    break;
-                    case 12:
-                        lv_textarea_del_char(txt);
-                        break;
-                        case 13:
-                            read_code = lv_textarea_get_text(txt);
-                            keypad_done = 1;
-                            break;
-                            default:
-                                lv_textarea_add_char(txt, btn[0]);
+            case 11:
+                lv_textarea_set_password_mode(txt, !lv_textarea_get_password_mode(txt));
+                lv_textarea_cursor_left(txt);
+                lv_textarea_cursor_right(txt);
+                notify_button_press();
+                break;
+            case 12:
+                lv_textarea_del_char(txt);
+                notify_button_press();
+                break;
+            case 13:
+                read_code = lv_textarea_get_text(txt);
+                keypad_done = 1;
+                notify_button_press();
+                break;
+            default:
+                lv_textarea_add_char(txt, btn[0]);
+                notify_key_press();
         }
     }
 }

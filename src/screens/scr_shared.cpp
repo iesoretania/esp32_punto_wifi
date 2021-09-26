@@ -19,6 +19,7 @@
 
 #include "scr_shared.h"
 #include "scr_codigo.h"
+#include "notify.h"
 
 static lv_obj_t *kb;             // Teclado en pantalla
 
@@ -26,6 +27,7 @@ void ta_config_click_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
     if (code == LV_EVENT_CLICKED) {
         configuring = 1;
+        notify_button_press();
     }
 }
 
@@ -33,6 +35,7 @@ void ta_keypad_click_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
     if (code == LV_EVENT_CLICKED) {
         keypad_requested = 1;
+        notify_button_press();
     }
 }
 
@@ -61,6 +64,8 @@ void ta_kb_form_event_cb(lv_event_t *e) {
         lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
         lv_obj_clear_state(e->target, LV_STATE_FOCUSED);
         lv_indev_reset(nullptr, e->target);
+    } else if (code == LV_EVENT_VALUE_CHANGED) {
+        notify_key_press();
     }
 }
 
