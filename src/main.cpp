@@ -93,8 +93,8 @@ void task_wifi_connection(lv_timer_t *timer) {
             // si se ha pulsado el botón de configuración, pasar a la pantalla correspondiente
             // NOTA: el botón aparece transcurridos 10 segundos sin haber completado la conexión a la red
             if (configuring) {
-                config_request();
-                state = CONFIG_SCREEN;
+                config_lock_request();
+                state = CONFIG_SCREEN_LOCK;
                 break;
             }
 
@@ -251,8 +251,15 @@ void task_wifi_connection(lv_timer_t *timer) {
             // cuando estamos en este estado, estamos esperando a que se introduzca el código
             // de administración para acceder a la pantalla de configuración
 
-            // ¿se ha dado a enviar en la pantalla de introducción del código?
-            if (keypad_done == 1) {
+            // Comprobar si se ha cerrado la pantalla de introducción del código o se ha acercado un llavero
+            uidS = rfid_read_id();
+
+            // se ha cerrado el teclado o se ha leído un llavero: procesar
+            if (keypad_done == 1 || !uidS.isEmpty()) {
+                if (!uidS.isEmpty()) {
+                    // hay un llavero, copiar su ID en el valor leído por teclado
+                    set_read_code(uidS);
+                }
                 // si no se ha introducido el código, volver al estado de conexión a la red
                 if (get_read_code().isEmpty()) {
                     keypad_done = 0;
