@@ -46,6 +46,6 @@ void seneca_set_punto(char *nombre);
 String seneca_get_punto();
 String seneca_get_tipo_acceso();
 void seneca_set_clave_punto(char *pos_inicio);
-void seneca_set_punto_id(int punto_id);
+int is_seneca_qrcode_enabled();
 
 #endif //ESP32_PUNTO_WIFI_SENECA_H

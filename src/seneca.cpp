@@ -53,6 +53,8 @@ String cookieSenecaP;
 // Estado del parser XML
 String modo, punto, xCentro, nombre_punto, tipo_acceso, nuevo_punto, last_usuario;
 
+int isClavePuntoSet = 0;
+
 TinyXML xml;
 uint8_t xmlBuffer[2048];
 
@@ -521,6 +523,7 @@ void process_seneca_response() {
     xCentro = "";
     nombre_punto = "";
     tipo_acceso = "";
+    isClavePuntoSet = 0;
 
     // análisis XML del HTML devuelto para extraer los valores de los campos ocultos
     xml.init(xmlBuffer, 2048, xml_html_callback);
@@ -543,6 +546,7 @@ void process_seneca_response() {
         pos = strstr(cadena, "base32ToHex('");
         if (pos) {
             seneca_set_clave_punto(pos + 13); // convertir lo que hay detrás de la comilla inicial
+            isClavePuntoSet = 1;
         }
     }
     while (*cadena != 0) {
@@ -621,4 +625,8 @@ void seneca_login(String &usuario, String &password) {
     response = "";
 
     send_seneca_login_data(datos);
+}
+
+int is_seneca_qrcode_enabled() {
+    return isClavePuntoSet;
 }

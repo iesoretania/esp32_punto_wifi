@@ -466,38 +466,39 @@ void task_main(lv_timer_t *timer) {
                     }
                 }
 
+                hide_main_estado();
+
                 // actualizar el texto de la hora que aparece en pantalla
                 time_t now = actualiza_hora();
 
                 // si es la primera vez que entramos o estamos en el segundo 0 o 30, actualizar código QR
-                if (last_now == 0 || now / 30 != last_now) {
+                if (is_seneca_qrcode_enabled() && (last_now == 0 || now / 30 != last_now)) {
                     last_now = now / 30;
                     uidS = seneca_get_qrcode_string(now);
                     update_main_qrcode(uidS.c_str(), uidS.length());
+                    hide_main_icon();
+                    show_main_qr();
+                }
+
+                if (!is_seneca_qrcode_enabled()) {
+                    show_main_icon();
+                    hide_main_qr();
                 }
 
                 // dependiendo del tiempo transcurrido mostramos u ocultamos información
                 // la secuencia se repite cada 10 segundos:
-                //    Segundo 1: Se muestra "Acerque llavero" y se oculta QR
-                //    Segundo 6: Se muestra "Pulse pantalla para PIN" y se oculta QR
-                //    Resto    : Se oculta el mensaje y se muestra el QR
+                //    Segundo 1 y 2: Se muestra "Acerque llavero"
+                //    Segundo 6 y 7: Se muestra "Pulse pantalla para PIN"
+                //            Resto: Se muestra la fecha actual
                 switch ((cuenta / 10) % 10) {
                     case 0:
-                        show_main_estado();
-                        show_main_icon();
-                        hide_main_qr();
-                        set_estado_main("Acerque llavero...");
+                    case 1:
+                        set_fecha_main("Acerque llavero...");
                         break;
                     case 5:
-                        show_main_estado();
-                        show_main_icon();
-                        hide_main_qr();
-                        set_estado_main("Pulse pantalla para PIN");
+                    case 6:
+                        set_fecha_main("Pulse pantalla para PIN");
                         break;
-                    default:
-                        hide_main_estado();
-                        hide_main_icon();
-                        show_main_qr();
                 }
             }
             break;
