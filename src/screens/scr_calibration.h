@@ -22,5 +22,6 @@
 
 void create_scr_calibration();
 void load_scr_calibration();
+void set_calibration_main_text(const char *string);
 
 #endif //ESP32_PUNTO_WIFI_SCR_CALIBRATION_H

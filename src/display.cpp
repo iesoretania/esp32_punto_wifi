@@ -108,11 +108,20 @@ void initialize_gui() {
         load_scr_calibration();
         lv_task_handler();
 
+        int startTime = millis();
         tft.calibrateTouch(calData, TFT_RED, TFT_WHITE, 20);
-
-        // Guardar datos de calibración
-        flash_set_blob("CalData", (uint8_t *) calData, sizeof(calData));
-        flash_commit();
+        if (millis() - startTime < 100) {
+            // Seguramente la calibración no se haya realizado con éxito
+            set_calibration_main_text("Ocurrió un error al calibrar el panel. Reiniciando en 10 segundos");
+            lv_task_handler();
+            // Esperar 10 segundos y reiniciar
+            delay(10000);
+            ESP.restart();
+        } else {
+            // Se ha tardado más de 100ms en calibrar, guardar datos de calibración y continuar
+            flash_set_blob("CalData", (uint8_t *) calData, sizeof(calData));
+            flash_commit();
+        }
     }
 
     tft.setTouch(calData);

@@ -22,12 +22,14 @@
 
 static lv_obj_t *scr_calibracion;// Pantalla de calibración de panel táctil
 
+lv_obj_t *lbl_calibracion;
+
 void create_scr_calibration() {
     scr_calibracion = lv_obj_create(nullptr);
     lv_obj_set_style_bg_color(scr_calibracion, LV_COLOR_MAKE(255, 255, 255), LV_PART_MAIN);
 
     // Etiqueta con instrucciones de calibración
-    lv_obj_t *lbl_calibracion = lv_label_create(scr_calibracion);
+    lbl_calibracion = lv_label_create(scr_calibracion);
     lv_label_set_text(lbl_calibracion, "Presione las puntas de las flechas rojas con la máxima precisión posible");
     lv_obj_set_style_text_font(lbl_calibracion, &mulish_32, LV_PART_MAIN);
     lv_obj_set_style_text_color(lbl_calibracion, lv_palette_main(LV_PALETTE_LIGHT_BLUE), LV_PART_MAIN);
@@ -39,4 +41,8 @@ void create_scr_calibration() {
 
 void load_scr_calibration() {
     lv_scr_load(scr_calibracion);
+}
+
+void set_calibration_main_text(const char *string) {
+    lv_label_set_text(lbl_calibracion, string);
 }
