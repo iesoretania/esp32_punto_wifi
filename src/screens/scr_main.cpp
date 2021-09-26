@@ -70,6 +70,7 @@ void create_scr_main() {
     lbl_icon_main = lv_label_create(scr_main);
     lv_obj_set_style_text_font(lbl_icon_main, &symbols, LV_PART_MAIN);
     set_icon_text(lbl_icon_main, "\uF063", LV_PALETTE_BLUE, 1, 0);
+    lv_obj_add_flag(lbl_icon_main, LV_OBJ_FLAG_HIDDEN);
 
     // Icono de configuración
     Serial.println("\t* Creando btn_config_main");
