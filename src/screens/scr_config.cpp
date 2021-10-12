@@ -96,6 +96,13 @@ static void btn_reset_wifi_config_event_cb(lv_event_t *e) {
     }
 }
 
+static void btn_reset_wifi_psk_event_cb(lv_event_t *e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_CLICKED) {
+        lv_textarea_set_text(txt_psk_config, "");
+    }
+}
+
 static void btn_recalibrate_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
     if (code == LV_EVENT_CLICKED) {
@@ -226,6 +233,15 @@ void create_scr_config() {
     lv_label_set_text(lbl_reset_wifi, "Restaurar conexión " PUNTO_CONTROL_SSID_PREDETERMINADO);
     lv_obj_align(lbl_reset_wifi, LV_ALIGN_TOP_MID, 0, 0);
 
+    // Botón borrar contraseña WiFi
+    lv_obj_t *btn_wifi_psk_config = lv_btn_create(tab_red_config);
+    lv_obj_set_height(btn_wifi_psk_config, LV_SIZE_CONTENT);
+    lv_obj_add_event_cb(btn_wifi_psk_config, btn_reset_wifi_psk_event_cb, LV_EVENT_CLICKED, nullptr);
+
+    lv_obj_t *lbl_reset_psk = lv_label_create(btn_wifi_psk_config);
+    lv_label_set_text(lbl_reset_psk, "Vaciar contraseña");
+    lv_obj_align(lbl_reset_psk, LV_ALIGN_TOP_MID, 0, 0);
+
     lv_obj_t *lbl_mac_wifi = lv_label_create(tab_red_config);
     String mac = "Dirección MAC: " + WiFi.macAddress();
     lv_label_set_text(lbl_mac_wifi, mac.c_str());
@@ -250,7 +266,8 @@ void create_scr_config() {
     lv_obj_set_grid_cell(txt_ssid_config, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_START, 1, 1);
     lv_obj_set_grid_cell(lbl_psk_config, LV_GRID_ALIGN_END, 0, 1, LV_GRID_ALIGN_CENTER, 2, 1);
     lv_obj_set_grid_cell(txt_psk_config, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_START, 2, 1);
-    lv_obj_set_grid_cell(btn_wifi_reset_config, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 3, 1);
+    lv_obj_set_grid_cell(btn_wifi_reset_config, LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_CENTER, 3, 1);
+    lv_obj_set_grid_cell(btn_wifi_psk_config, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_CENTER, 3, 1);
     lv_obj_set_grid_cell(lbl_mac_wifi, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 4, 1);
 
     // PANEL DE CONFIGURACIÓN DE PANTALLA
