@@ -622,6 +622,14 @@ void task_main(lv_timer_t *timer) {
     }
 }
 
+void xTask_notify(void *pvParameter) {
+    // Esta tarea actualiza el estado de los LEDs
+    while(1) {
+        delay(50);
+        notify_tick();
+    }
+}
+
 void config_request() {
     reset_read_code();
     update_scr_config();
@@ -695,6 +703,10 @@ void setup() {
     Serial.println("Inicializando Wi-Fi");
     set_estado_splash_format("Conectando a %s...", flash_get_string("net.wifi_ssid").c_str());
     WiFi.begin(flash_get_string("net.wifi_ssid").c_str(), flash_get_string("net.wifi_psk").c_str());
+
+    // Inicializar luces de estado
+    Serial.println("Creando tarea LEDs");
+    xTaskCreatePinnedToCore(&xTask_notify, "LED", 4096, nullptr, 10, nullptr, 1);
 
     // Comenzar la conexión a la red
     Serial.println("Creando tarea Wi-Fi");

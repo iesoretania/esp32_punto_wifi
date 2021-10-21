@@ -20,6 +20,7 @@
 #ifndef ESP32_PUNTO_WIFI_NOTIFY_H
 #define ESP32_PUNTO_WIFI_NOTIFY_H
 
+void notify_tick();
 void notify_start();
 void notify_ready();
 void notify_check_start();
