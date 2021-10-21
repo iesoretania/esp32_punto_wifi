@@ -230,7 +230,7 @@ void create_scr_config() {
     lv_obj_add_event_cb(btn_wifi_reset_config, btn_reset_wifi_config_event_cb, LV_EVENT_CLICKED, nullptr);
 
     lv_obj_t *lbl_reset_wifi = lv_label_create(btn_wifi_reset_config);
-    lv_label_set_text(lbl_reset_wifi, "Restaurar conexión " PUNTO_CONTROL_SSID_PREDETERMINADO);
+    lv_label_set_text(lbl_reset_wifi, PUNTO_CONTROL_SSID_PREDETERMINADO);
     lv_obj_align(lbl_reset_wifi, LV_ALIGN_TOP_MID, 0, 0);
 
     // Botón borrar contraseña WiFi
@@ -353,6 +353,15 @@ void create_scr_config() {
     lv_label_set_text(lbl_logout_config, "Cerrar sesión");
     lv_obj_align(lbl_logout_config, LV_ALIGN_TOP_MID, 0, 0);
 
+    // Botón para actualizar el firmware
+    lv_obj_t *btn_update_config = lv_btn_create(tab_seguridad_config);
+    lv_obj_set_height(btn_update_config, LV_SIZE_CONTENT);
+    lv_obj_add_event_cb(btn_update_config, btn_logout_event_cb, LV_EVENT_CLICKED, nullptr);
+    lv_obj_t *lbl_update_config = lv_label_create(btn_update_config);
+    lv_label_set_text(lbl_update_config, "Actualizar firmware");
+    lv_obj_align(lbl_update_config, LV_ALIGN_TOP_MID, 0, 0);
+    lv_obj_add_state(btn_update_config, LV_STATE_DISABLED);
+
     // Colocar elementos en una rejilla (5 filas, 2 columnas)
     static lv_coord_t grid_seguridad_row_dsc[] = {
             LV_GRID_CONTENT,  /* Título */
@@ -360,6 +369,7 @@ void create_scr_config() {
             LV_GRID_CONTENT,  /* Cambiar código de administración, botón */
             LV_GRID_CONTENT,  /* Cambiar punto de acceso, botón */
             LV_GRID_CONTENT,  /* Cerrar sesión, botón */
+            LV_GRID_CONTENT,  /* Actualizar firmware, botón */
             LV_GRID_TEMPLATE_LAST
     };
 
@@ -371,6 +381,7 @@ void create_scr_config() {
     lv_obj_set_grid_cell(btn_cambio_codigo_config, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 2, 1);
     lv_obj_set_grid_cell(btn_punto_acceso_config, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 3, 1);
     lv_obj_set_grid_cell(btn_logout_config, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 4, 1);
+    lv_obj_set_grid_cell(btn_update_config, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 5, 1);
 }
 
 
