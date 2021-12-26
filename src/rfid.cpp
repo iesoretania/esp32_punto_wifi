@@ -19,24 +19,48 @@
 
 #include <Arduino.h>
 #include <SPI.h>
+
+#ifdef RFID_RC522
 #include <MFRC522.h>
+#else
+#include "drivers/rdm6300.h"
+#endif
 
 #include "rfid.h"
 #include "notify.h"
 
+#ifdef RFID_RC522
 MFRC522 mfrc522(RFID_SDA_PIN, RFID_RST_PIN);
+#else
+Rdm6300 rdm6300;
+uint32_t lastTag;
+#endif
 
 void initialize_rfid() {
     SPI.begin();
+#ifdef RFID_RC522
     mfrc522.PCD_Init();
+#else
+    rdm6300.begin(RFID_RDM6300_TX, 1);
+#endif
 }
 
 bool rfid_new_card_detected() {
+#ifdef RFID_RC522
     return mfrc522.PICC_IsNewCardPresent();
+#else
+    if (rdm6300.update()) {
+        lastTag = rdm6300.get_tag_id();
+        return true;
+    } else {
+        return false;
+    }
+#endif
 }
 String rfid_read_id() {
     String uidS;
 
+#ifdef RFID_RC522
     if (mfrc522.PICC_IsNewCardPresent()) {
         notify_check_start();
 
@@ -55,5 +79,15 @@ String rfid_read_id() {
         }
         mfrc522.PICC_HaltA();
     }
+#else
+    if (rdm6300.update()) {
+        notify_check_start();
+        uidS = (String) lastTag;
+
+        while (uidS.length() < 10) {
+            uidS = "0" + uidS;
+        }
+    }
+#endif
     return uidS;
 }
