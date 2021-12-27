@@ -26,7 +26,6 @@
 MelodyPlayer player(BUZZER_PIN, 0, LOW);
 
 const int LED_COUNT = 8;
-const int DATA_PIN = 13;
 const int CHANNEL = 1;
 
 SmartLed *leds = nullptr;
@@ -65,7 +64,7 @@ void set_led_rainbow();
 void notify_tick() {
     // SmartLed -> RMT driver (WS2812/WS2812B/SK6812/WS2813)
     if (nullptr == leds) {
-        leds = new SmartLed(LED_WS2812B, LED_COUNT, DATA_PIN, CHANNEL, DoubleBuffer);
+        leds = new SmartLed(LED_WS2812B, LED_COUNT, RGB_PIN, CHANNEL, DoubleBuffer);
     }
 
     switch (led_status) {
