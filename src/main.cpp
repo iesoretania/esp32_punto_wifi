@@ -622,9 +622,9 @@ void task_main(lv_timer_t *timer) {
     }
 }
 
-void xTask_notify(void *pvParameter) {
+[[noreturn]] void xTask_notify(void *pvParameter) {
     // Esta tarea actualiza el estado de los LEDs
-    while(1) {
+    while (1) {
         delay(50);
         notify_tick();
     }
@@ -663,56 +663,41 @@ void setup() {
     // INICIALIZAR SUBSISTEMAS
 
     // Inicializar puerto serie (para mensajes de depuración)
-    Serial.begin(115200);
+    //Serial.begin(115200);
 
     // Inicializar flash
-    Serial.println("Inicializando Flash");
     initialize_flash();
 
     // Inicializar lector
-    Serial.println("Inicializando RFID");
     initialize_rfid();
 
     // Inicializar GUI
-    Serial.println("Inicializando GUI");
     initialize_gui();
 
     // Inicializar subsistema HTTP
-    Serial.println("Inicializando HTTP");
     initialize_seneca();
 
     notify_start();
 
     // Crear pantallas y cambiar a la pantalla de arranque
-    Serial.println("Creando pantalla splash");
     create_scr_splash();
-    Serial.println("Creando pantalla main");
     create_scr_main();
-    Serial.println("Creando pantalla check");
     create_scr_check();
-    Serial.println("Creando pantalla login");
     create_scr_login();
-    Serial.println("Creando pantalla selection");
     create_scr_selection();
-    Serial.println("Creando pantalla config");
     create_scr_config();
-    Serial.println("Creando pantalla codigo");
     create_scr_codigo();
 
     // Inicializar WiFi
-    Serial.println("Inicializando Wi-Fi");
     set_estado_splash_format("Conectando a %s...", flash_get_string("net.wifi_ssid").c_str());
     WiFi.begin(flash_get_string("net.wifi_ssid").c_str(), flash_get_string("net.wifi_psk").c_str());
 
     // Inicializar luces de estado
-    Serial.println("Creando tarea LEDs");
     xTaskCreatePinnedToCore(&xTask_notify, "LED", 4096, nullptr, 10, nullptr, 1);
 
     // Comenzar la conexión a la red
-    Serial.println("Creando tarea Wi-Fi");
     lv_timer_create(task_wifi_connection, 100, nullptr);
 }
-
 
 void loop() {
     lv_task_handler();

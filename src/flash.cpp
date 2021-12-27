@@ -23,13 +23,20 @@
 #include "flash.h"
 
 void initialize_flash() {
+    bool erase_flash = false;
+
     NVS.begin();
 
     // Botón Boot: si está pulsado durante el inicio, reinicializar flash
     pinMode(0, INPUT);
 
-    if (NVS.getInt("PUNTO_CONTROL") != 3 || digitalRead(0) != HIGH) {
-        Serial.println("Borrando flash...");
+    if (digitalRead(0) != HIGH) {
+        // esperar un segundo, si sigue pulsado el botón "BOOT", borrar flash
+        delay(1000);
+        erase_flash = digitalRead(0) != HIGH;
+    }
+    if (NVS.getInt("PUNTO_CONTROL") != 3 || erase_flash) {
+        // borrando flash
         NVS.eraseAll(false);
         NVS.setInt("PUNTO_CONTROL", 3);
         NVS.setString("CPP-authToken", "");
@@ -37,7 +44,6 @@ void initialize_flash() {
         // configuración por defecto de la WiFi
         NVS.setString("net.wifi_ssid", PUNTO_CONTROL_SSID_PREDETERMINADO);
         NVS.setString("net.wifi_psk", PUNTO_CONTROL_PSK_PREDETERMINADA);
-        Serial.println("Flash inicializada...");
         NVS.commit();
     }
 }

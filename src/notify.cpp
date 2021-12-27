@@ -89,13 +89,11 @@ void notify_tick() {
                 animation_state = 0;
                 transition = 0;
                 target_color = led_animation[0].color;
-                Serial.println("* Inicializando animacion");
             }
             if (animation_state >= 0) {
                 if (transition < 10000) {
                     transition += led_animation[animation_state].increment;
                     if (transition > 10000) transition = 10000;
-                    Serial.printf("- Incrementando transicion: %d -> [", transition);
 
                     float r = ((float) target_color.r * (float) transition +
                                (float) source_color.r * (10000 - (float) transition)) / 10000.0f;
@@ -104,16 +102,13 @@ void notify_tick() {
                     float b = ((float) target_color.b * (float) transition +
                                (float) source_color.b * (10000 - (float) transition)) / 10000.0f;
                     current_color = Rgb((int) r & 0xFF, (int) g & 0xFF, (int) b & 0xFF);
-                    Serial.printf("%02x, %02x, %02x]\n", (int) r & 0xFF, (int) g & 0xFF, (int) b & 0xFF);
                 } else {
                     if (led_animation[animation_state].delay > 0) {
-                        Serial.printf("- Retardo: %d\n", led_animation[animation_state].delay);
                         led_animation[animation_state].delay--;
                     }
                     if (led_animation[animation_state].delay == 0) {
                         source_color = led_animation[animation_state].color;
                         animation_state++;
-                        Serial.printf("- Cambio de item de animacion: %d\n", animation_state);
                         target_color = led_animation[animation_state].color;
                         transition = 0;
                     }
