@@ -349,11 +349,6 @@ void create_scr_config() {
     lv_label_set_text(lbl_seguridad_config, "Parámetros de acceso");
     lv_obj_add_style(lbl_seguridad_config, &style_title, LV_PART_MAIN);
 
-    // Switch de forzar activación
-    sw_forzar_activacion_config = lv_switch_create(tab_seguridad_config);
-    lv_obj_t *lbl_forzar_activacion_config = lv_label_create(tab_seguridad_config);
-    lv_label_set_text(lbl_forzar_activacion_config, "Activar sólo con codigo");
-
     // Botón para cambiar código de administración
     lv_obj_t *btn_cambio_codigo_config = lv_btn_create(tab_seguridad_config);
     lv_obj_set_height(btn_cambio_codigo_config, LV_SIZE_CONTENT);
@@ -380,24 +375,29 @@ void create_scr_config() {
     lv_label_set_text(lbl_logout_config, "Cerrar sesión");
     lv_obj_align(lbl_logout_config, LV_ALIGN_TOP_MID, 0, 0);
 
+    // Switch de forzar activación
+    sw_forzar_activacion_config = lv_switch_create(tab_seguridad_config);
+    lv_obj_t *lbl_forzar_activacion_config = lv_label_create(tab_seguridad_config);
+    lv_label_set_text(lbl_forzar_activacion_config, "Activar sólo con codigo");
+
     // Colocar elementos en una rejilla (5 filas, 2 columnas)
     static lv_coord_t grid_seguridad_row_dsc[] = {
             LV_GRID_CONTENT,  /* Título */
-            LV_GRID_CONTENT,  /* Forzar activación */
             LV_GRID_CONTENT,  /* Cambiar código de administración, botón */
             LV_GRID_CONTENT,  /* Cambiar punto de acceso, botón */
             LV_GRID_CONTENT,  /* Cerrar sesión, botón */
+            LV_GRID_CONTENT,  /* Forzar activación */
             LV_GRID_TEMPLATE_LAST
     };
 
     lv_obj_set_grid_dsc_array(tab_seguridad_config, grid_col_dsc, grid_seguridad_row_dsc);
 
     lv_obj_set_grid_cell(lbl_seguridad_config, LV_GRID_ALIGN_START, 0, 2, LV_GRID_ALIGN_CENTER, 0, 1);
-    lv_obj_set_grid_cell(sw_forzar_activacion_config, LV_GRID_ALIGN_END, 0, 1, LV_GRID_ALIGN_CENTER, 1, 1);
-    lv_obj_set_grid_cell(lbl_forzar_activacion_config, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_CENTER, 1, 1);
-    lv_obj_set_grid_cell(btn_cambio_codigo_config, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 2, 1);
-    lv_obj_set_grid_cell(btn_punto_acceso_config, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 3, 1);
-    lv_obj_set_grid_cell(btn_logout_config, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 4, 1);
+    lv_obj_set_grid_cell(btn_cambio_codigo_config, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 1, 1);
+    lv_obj_set_grid_cell(btn_punto_acceso_config, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 2, 1);
+    lv_obj_set_grid_cell(btn_logout_config, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 3, 1);
+    lv_obj_set_grid_cell(sw_forzar_activacion_config, LV_GRID_ALIGN_END, 0, 1, LV_GRID_ALIGN_CENTER, 4, 1);
+    lv_obj_set_grid_cell(lbl_forzar_activacion_config, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_CENTER, 4, 1);
 
     // PANEL DE CONFIGURACIÓN DE FIRMWARE
     lv_obj_set_style_pad_left(tab_firmware_config, LV_HOR_RES * 8 / 100, 0);

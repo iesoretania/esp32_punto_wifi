@@ -28,6 +28,8 @@ static lv_obj_t *lbl_estado_splash;
 static lv_obj_t *lbl_version_splash;
 static lv_obj_t *btn_config_splash;
 
+lv_obj_t *img;
+
 void create_scr_splash() {
     // CREAR PANTALLA DE ARRANQUE (splash screen)
     scr_splash = lv_obj_create(nullptr);
@@ -35,7 +37,7 @@ void create_scr_splash() {
 
     // Logo de la CED centrado
     LV_IMG_DECLARE(logo_ced)
-    lv_obj_t *img = lv_img_create(scr_splash);
+    img = lv_img_create(scr_splash);
     lv_img_set_src(img, &logo_ced);
     lv_obj_align(img, LV_ALIGN_CENTER, 0, 0);
 
@@ -122,4 +124,10 @@ int is_loaded_scr_splash() {
 
 void clean_scr_splash() {
     lv_obj_clean(scr_splash);
+}
+
+void change_logo_splash() {
+    LV_IMG_DECLARE(logo_seneca)
+    lv_img_set_src(img, &logo_seneca);
+    lv_obj_align(img, LV_ALIGN_CENTER, 0, 0);
 }

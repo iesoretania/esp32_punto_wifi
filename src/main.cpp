@@ -148,6 +148,9 @@ void task_wifi_connection(lv_timer_t *timer) {
         case NTP_WAIT:
             // comprobar si ya estamos en hora. En ese caso, pasar al estado de comprobación de conectividad
             if (sntp_get_sync_status() == SNTP_SYNC_STATUS_COMPLETED) {
+                // el reloj ha sido sincronizado
+                // cambiar el logo por el de Séneca y comprobar si estamos actualizando el firmware
+                change_logo_splash();
                 if (flash_get_string("firmware_url").length() > 0) {
                     state = FIRMWARE_FLASHING;
                     // no podemos dejar la tarea que ilumina los LEDs, así que dejamos un color fijo
@@ -159,18 +162,15 @@ void task_wifi_connection(lv_timer_t *timer) {
                     flash_erase("firmware_url");
                     set_estado_splash("Actualizando firmware...");
                 } else {
+                    // no actualizamos el firmware, pasamos a comprobar conectividad con Séneca
                     state = CHECKING;
                 }
                 cuenta = 0;
             }
             break;
         case FIRMWARE_FLASHING:
-            if (cuenta > 10) {
-                if (url.length() > 0) {
-                    do_firmware_upgrade(url.c_str());
-                }
-            }
-            cuenta++;
+            // llamar a la rutina de actualización del firmware para que avance
+            do_firmware_upgrade(url.c_str());
             break;
         case CHECKING:
             // estado de comprobación de conectividad

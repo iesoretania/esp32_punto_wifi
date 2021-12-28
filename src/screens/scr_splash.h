@@ -26,6 +26,7 @@ void create_scr_splash();
 void load_scr_splash();
 int is_loaded_scr_splash();
 void clean_scr_splash();
+void change_logo_splash();
 
 void set_estado_splash_format(const char *string, const char *p);
 void set_estado_splash(const char *string);
