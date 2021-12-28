@@ -156,12 +156,10 @@ static void btn_firmware_config_event_cb(lv_event_t *e) {
     if (code == LV_EVENT_CLICKED) {
         lv_label_set_text(lbl_firmware_config, "Comprobando actualizaciones...");
         lv_obj_add_state(btn_firmware_config, LV_STATE_DISABLED);
-
+        lv_task_handler();
         update_scr_firmware();
+        lv_task_handler();
         load_scr_firmware();
-
-        lv_label_set_text(lbl_firmware_config, "Actualizar firmware");
-        lv_obj_clear_state(btn_firmware_config, LV_STATE_DISABLED);
     }
 }
 

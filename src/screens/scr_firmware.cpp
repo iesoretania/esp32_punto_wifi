@@ -97,7 +97,7 @@ esp_http_client_config_t fw_http_config;
 esp_http_client_handle_t fw_http_client = nullptr;
 String fw_response;
 String firmware_url;
-uint32_t firmware_status;
+uint32_t firmware_status = 0;
 
 FirmwareHttpRequestStatus firmware_http_request_status;
 
@@ -346,7 +346,6 @@ esp_err_t fw_http_event_handle(esp_http_client_event_t *evt) {
                 if (pos2 >= 0) {
                     firmware_url = fw_response.substring(pos + 24, pos2);
                     lv_textarea_set_text(txt_url_firmware, firmware_url.c_str());
-                    firmware_status = 1;
                 }
             }
             pos = fw_response.indexOf("\"name\":\"");
@@ -358,6 +357,7 @@ esp_err_t fw_http_event_handle(esp_http_client_event_t *evt) {
             }
             firmware_http_request_status = FW_HTTP_DONE;
             fw_response = "";
+            firmware_status = 1;
             break;
         default:
             // uy, algo no esperado: error

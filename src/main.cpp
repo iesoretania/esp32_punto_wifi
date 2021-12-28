@@ -242,6 +242,7 @@ void task_wifi_connection(lv_timer_t *timer) {
                 cuenta = 0;
                 state = CHECKING;
             }
+            // si se pulsa el botón de configurar
             if (configuring) {
                 config_lock_request();
                 state = CONFIG_SCREEN_LOCK;
