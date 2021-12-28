@@ -48,7 +48,6 @@ void btn_numpad_event_cb(lv_event_t *e) {
 
     if (code == LV_EVENT_DRAW_PART_BEGIN) {
         lv_obj_draw_part_dsc_t *dsc = (lv_obj_draw_part_dsc_t *) lv_event_get_param(e);
-        dsc->label_dsc->font = &mulish_24;
 
         if (dsc->id == 10) {
             if (lv_btnmatrix_get_selected_btn(obj) == dsc->id) {
@@ -129,10 +128,15 @@ void create_scr_codigo() {
     lv_obj_add_state(txt_codigo, LV_STATE_FOCUSED);
 
     // Teclado numérico
+    static lv_style_t style_buttons;
+    lv_style_init(&style_buttons);
+    lv_style_set_text_font(&style_buttons, &mulish_24);
+
     lv_obj_t *btn_matrix_numeros = lv_btnmatrix_create(scr_codigo);
     lv_btnmatrix_set_map(btn_matrix_numeros, botones);
     lv_btnmatrix_set_btn_width(btn_matrix_numeros, 13, 2);
     lv_btnmatrix_set_btn_ctrl(btn_matrix_numeros, 11, LV_BTNMATRIX_CTRL_CHECKABLE);
+    lv_obj_add_style(btn_matrix_numeros, &style_buttons, LV_BTNMATRIX_DRAW_PART_BTN);
     lv_obj_align(btn_matrix_numeros, LV_ALIGN_CENTER, 0, 0);
     lv_obj_add_event_cb(btn_matrix_numeros, btn_numpad_event_cb, LV_EVENT_ALL, txt_codigo);
     lv_obj_set_width(btn_matrix_numeros, lv_pct(100));

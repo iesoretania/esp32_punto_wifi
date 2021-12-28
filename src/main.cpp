@@ -129,21 +129,25 @@ void task_wifi_connection(lv_timer_t *timer) {
             // ocultar icono de configuración por si estuviera visible
             hide_splash_config();
             set_estado_splash("Ajustando hora...");
-            // ajustamos la zona horaria según la cadena de configuración
-            setenv("TZ", PUNTO_CONTROL_HUSO_HORARIO, 1);
-            tzset();
-            // modo de operación SNTP: poll unicast
-            sntp_setoperatingmode(SNTP_OPMODE_POLL);
-            // si ha fallado la resolución DNS antes, usar el servidor NTP del pool español
-            // si no ha fallado, usar c0 como servidor NTP
-            if (code != 1) {
-                sntp_setservername(0, (char *) PUNTO_CONTROL_NTP_SERVER);
+            if (!sntp_enabled()) {
+                // ajustamos la zona horaria según la cadena de configuración
+                setenv("TZ", PUNTO_CONTROL_HUSO_HORARIO, 1);
+                tzset();
+                // modo de operación SNTP: poll unicast
+                sntp_setoperatingmode(SNTP_OPMODE_POLL);
+                // si ha fallado la resolución DNS antes, usar el servidor NTP del pool español
+                // si no ha fallado, usar c0 como servidor NTP
+                if (code != 1) {
+                    sntp_setservername(0, (char *) PUNTO_CONTROL_NTP_SERVER);
+                } else {
+                    sntp_setservername(0, (char *) "c0");
+                }
+                // inicializar SNTP para poner el reloj interno en hora
+                sntp_init();
+                state = NTP_WAIT;
             } else {
-                sntp_setservername(0, (char *) "c0");
+                state = CHECKING;
             }
-            // inicializar SNTP para poner el reloj interno en hora
-            sntp_init();
-            state = NTP_WAIT;
             break;
         case NTP_WAIT:
             // comprobar si ya estamos en hora. En ese caso, pasar al estado de comprobación de conectividad

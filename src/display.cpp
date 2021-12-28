@@ -35,8 +35,7 @@ void espi_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *col
     int32_t h = (area->y2 - area->y1 + 1);
 
     tft.startWrite();
-    tft.setAddrWindow(area->x1, area->y1, w, h);
-    tft.pushColors(&color_p->full, w * h, false);    // importante que swap sea true en este display
+    tft.pushImage(area->x1, area->y1, w, h, &color_p->full);
     tft.endWrite();
 
     lv_disp_flush_ready(disp);
@@ -96,7 +95,7 @@ void initialize_gui() {
     indev_drv.read_cb = espi_touch_read;
     lv_indev_drv_register(&indev_drv);
 
-    tft.begin();            /* Inicializar TFT */
+    tft.init();            /* Inicializar TFT */
     tft.setRotation(3);     /* Orientación horizontal */
 
     uint16_t calData[5];

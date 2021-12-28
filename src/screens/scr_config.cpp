@@ -44,23 +44,21 @@ static void btn_config_event_cb(lv_event_t *e) {
 
     if (code == LV_EVENT_DRAW_PART_BEGIN) {
         lv_obj_draw_part_dsc_t *dsc = (lv_obj_draw_part_dsc_t *) lv_event_get_param(e);
-        dsc->label_dsc->font = &mulish_24;
-
         if (dsc->id == 1) {
+            dsc->rect_dsc->radius = 0;
             if (lv_btnmatrix_get_selected_btn(obj) == dsc->id) {
-                dsc->rect_dsc->bg_color = lv_palette_darken(LV_PALETTE_RED, 3);
+                dsc->rect_dsc->bg_color = lv_palette_lighten(LV_PALETTE_RED, 4);
             } else {
-                dsc->rect_dsc->bg_color = lv_palette_main(LV_PALETTE_RED);
+                dsc->rect_dsc->bg_color = lv_palette_lighten(LV_PALETTE_RED, 2);
             }
-            dsc->label_dsc->color = lv_color_white();
         }
         if (dsc->id == 0) {
+            dsc->rect_dsc->radius = 0;
             if (lv_btnmatrix_get_selected_btn(obj) == dsc->id) {
-                dsc->rect_dsc->bg_color = lv_palette_darken(LV_PALETTE_GREEN, 3);
+                dsc->rect_dsc->bg_color = lv_palette_lighten(LV_PALETTE_GREEN, 4);
             } else {
-                dsc->rect_dsc->bg_color = lv_palette_main(LV_PALETTE_GREEN);
+                dsc->rect_dsc->bg_color = lv_palette_lighten(LV_PALETTE_GREEN, 2);
             }
-            dsc->label_dsc->color = lv_color_white();
         }
     }
     if (code == LV_EVENT_VALUE_CHANGED) {
@@ -211,16 +209,22 @@ void create_scr_config() {
     lv_style_set_pad_gap(&style_bg, 0);
     lv_style_set_clip_corner(&style_bg, true);
     lv_style_set_border_width(&style_bg, 0);
+    lv_style_set_bg_color(&style_bg, lv_color_white());
 
     // Crear botón de aceptar y cancelar
+    static lv_style_t style_buttons;
+
+    lv_style_init(&style_buttons);
+    lv_style_set_text_font(&style_buttons, &mulish_24);
+    lv_style_set_text_color(&style_buttons, lv_color_white());
     lv_obj_t *btn_matrix_config = lv_btnmatrix_create(scr_config);
     lv_btnmatrix_set_map(btn_matrix_config, botones);
     lv_obj_set_width(btn_matrix_config, LV_HOR_RES * 2 / 10);
     lv_obj_set_height(btn_matrix_config, 50);
-    lv_obj_set_style_pad_all(btn_matrix_config, 3, LV_PART_MAIN);
     lv_obj_align(btn_matrix_config, LV_ALIGN_TOP_RIGHT, 0, 0);
-    lv_obj_add_event_cb(btn_matrix_config, btn_config_event_cb, LV_EVENT_ALL, nullptr);
     lv_obj_add_style(btn_matrix_config, &style_bg, LV_PART_MAIN);
+    lv_obj_add_style(btn_matrix_config, &style_buttons, LV_BTNMATRIX_DRAW_PART_BTN);
+    lv_obj_add_event_cb(btn_matrix_config, btn_config_event_cb, LV_EVENT_ALL, nullptr);
 
     // PANEL DE CONFIGURACIÓN DE RED
     lv_obj_set_style_pad_left(tab_red_config, LV_HOR_RES * 8 / 100, 0);
