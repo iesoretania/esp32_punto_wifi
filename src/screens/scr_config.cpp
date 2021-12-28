@@ -151,6 +151,13 @@ static void btn_logout_event_cb(lv_event_t *e) {
     }
 }
 
+static void scroll_begin_event_cb(lv_event_t *e) {
+    if (lv_event_get_code(e) == LV_EVENT_SCROLL_BEGIN) {
+        lv_anim_t *a = (lv_anim_t *) lv_event_get_param(e);
+        if (a) a->time = 0;
+    }
+}
+
 static void btn_firmware_config_event_cb(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
     if (code == LV_EVENT_CLICKED) {
@@ -160,6 +167,8 @@ static void btn_firmware_config_event_cb(lv_event_t *e) {
         update_scr_firmware();
         lv_task_handler();
         load_scr_firmware();
+        lv_label_set_text(lbl_firmware_config, "Buscar y actualizar firmware");
+        lv_obj_clear_state(btn_firmware_config, LV_STATE_DISABLED);
     }
 }
 
@@ -184,6 +193,8 @@ void create_scr_config() {
     // Crear pestañas
     lv_obj_t *tabview_config;
     tabview_config = lv_tabview_create(scr_config, LV_DIR_TOP, 50);
+    lv_obj_add_event_cb(lv_tabview_get_content(tabview_config), scroll_begin_event_cb, LV_EVENT_SCROLL_BEGIN, nullptr);
+
     lv_obj_t *tab_btns = lv_tabview_get_tab_btns(tabview_config);
     lv_obj_set_style_pad_right(tab_btns, LV_HOR_RES * 2 / 10 + 3, 0);
 
@@ -192,6 +203,7 @@ void create_scr_config() {
     lv_obj_t *tab_red_config = lv_tabview_add_tab(tabview_config, "Red");
     lv_obj_t *tab_pantalla_config = lv_tabview_add_tab(tabview_config, "Pantalla");
     lv_obj_t *tab_seguridad_config = lv_tabview_add_tab(tabview_config, "Acceso");
+    lv_obj_t *tab_firmware_config = lv_tabview_add_tab(tabview_config, "Firmware");
 
     static lv_style_t style_bg;
     lv_style_init(&style_bg);
@@ -368,14 +380,6 @@ void create_scr_config() {
     lv_label_set_text(lbl_logout_config, "Cerrar sesión");
     lv_obj_align(lbl_logout_config, LV_ALIGN_TOP_MID, 0, 0);
 
-    // Botón para actualizar el firmware
-    btn_firmware_config = lv_btn_create(tab_seguridad_config);
-    lv_obj_set_height(btn_firmware_config, LV_SIZE_CONTENT);
-    lv_obj_add_event_cb(btn_firmware_config, btn_firmware_config_event_cb, LV_EVENT_CLICKED, nullptr);
-    lbl_firmware_config = lv_label_create(btn_firmware_config);
-    lv_label_set_text(lbl_firmware_config, "Actualizar firmware");
-    lv_obj_align(lbl_firmware_config, LV_ALIGN_TOP_MID, 0, 0);
-
     // Colocar elementos en una rejilla (5 filas, 2 columnas)
     static lv_coord_t grid_seguridad_row_dsc[] = {
             LV_GRID_CONTENT,  /* Título */
@@ -383,7 +387,6 @@ void create_scr_config() {
             LV_GRID_CONTENT,  /* Cambiar código de administración, botón */
             LV_GRID_CONTENT,  /* Cambiar punto de acceso, botón */
             LV_GRID_CONTENT,  /* Cerrar sesión, botón */
-            LV_GRID_CONTENT,  /* Actualizar firmware, botón */
             LV_GRID_TEMPLATE_LAST
     };
 
@@ -395,7 +398,43 @@ void create_scr_config() {
     lv_obj_set_grid_cell(btn_cambio_codigo_config, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 2, 1);
     lv_obj_set_grid_cell(btn_punto_acceso_config, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 3, 1);
     lv_obj_set_grid_cell(btn_logout_config, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 4, 1);
-    lv_obj_set_grid_cell(btn_firmware_config, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 5, 1);
+
+    // PANEL DE CONFIGURACIÓN DE FIRMWARE
+    lv_obj_set_style_pad_left(tab_firmware_config, LV_HOR_RES * 8 / 100, 0);
+    lv_obj_set_style_pad_right(tab_firmware_config, LV_HOR_RES * 8 / 100, 0);
+
+    lv_obj_t *lbl_firmware_title_config = lv_label_create(tab_firmware_config);
+    lv_label_set_text(lbl_firmware_title_config, "Configuración del firmware");
+    lv_obj_add_style(lbl_firmware_title_config, &style_title, LV_PART_MAIN);
+
+    // Versión actual
+    lv_obj_t *lbl_current_caption_config = lv_label_create(tab_firmware_config);
+    lv_label_set_text(lbl_current_caption_config, "Actual:");
+    lv_obj_t *lbl_current_version_config = lv_label_create(tab_firmware_config);
+    lv_label_set_text(lbl_current_version_config, PUNTO_CONTROL_VERSION);
+
+    // Botón para actualizar el firmware
+    btn_firmware_config = lv_btn_create(tab_firmware_config);
+    lv_obj_set_height(btn_firmware_config, LV_SIZE_CONTENT);
+    lv_obj_add_event_cb(btn_firmware_config, btn_firmware_config_event_cb, LV_EVENT_CLICKED, nullptr);
+    lbl_firmware_config = lv_label_create(btn_firmware_config);
+    lv_label_set_text(lbl_firmware_config, "Buscar y actualizar firmware");
+    lv_obj_align(lbl_firmware_config, LV_ALIGN_TOP_MID, 0, 0);
+
+    // Colocar elementos en una rejilla (5 filas, 2 columnas)
+    static lv_coord_t grid_firmware_row_dsc[] = {
+            LV_GRID_CONTENT,  /* Título */
+            LV_GRID_CONTENT,  /* Versión actual del firmware */
+            LV_GRID_CONTENT,  /* Actualizar firmware, botón */
+            LV_GRID_TEMPLATE_LAST
+    };
+
+    lv_obj_set_grid_dsc_array(tab_firmware_config, grid_col_dsc, grid_firmware_row_dsc);
+
+    lv_obj_set_grid_cell(lbl_firmware_title_config, LV_GRID_ALIGN_START, 0, 2, LV_GRID_ALIGN_CENTER, 0, 1);
+    lv_obj_set_grid_cell(lbl_current_caption_config, LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_CENTER, 1, 1);
+    lv_obj_set_grid_cell(lbl_current_version_config, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_CENTER, 1, 1);
+    lv_obj_set_grid_cell(btn_firmware_config, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 2, 1);
 }
 
 

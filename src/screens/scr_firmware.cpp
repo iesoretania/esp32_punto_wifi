@@ -88,7 +88,7 @@ cPUeybQ=
 
 static lv_obj_t *scr_firmware;     // Pantalla de configuración
 static lv_obj_t *txt_url_firmware;
-static lv_obj_t *sw_ignore_check;
+static lv_obj_t *sw_enforce_check;
 static lv_obj_t *lbl_latest_version_firmware;
 static lv_obj_t *btn_update_firmware;
 
@@ -101,6 +101,8 @@ uint32_t firmware_status = 0;
 
 FirmwareHttpRequestStatus firmware_http_request_status;
 
+char update_url[1000];
+
 void do_firmware_upgrade(const char *url) {
     static int status = 0;
     static int cuenta = 0;
@@ -111,7 +113,8 @@ void do_firmware_upgrade(const char *url) {
     esp_err_t err;
 
     if (status == 0) {
-        config.url = url;
+        strncpy(update_url, url, 1000);
+        config.url = update_url;
         config.cert_pem = CERT_PEM;
         config.buffer_size = 4096;
 
@@ -268,11 +271,11 @@ void create_scr_firmware() {
     lv_obj_add_event_cb(txt_url_firmware, ta_kb_form_event_cb, LV_EVENT_ALL, pnl_firmware);
     lv_obj_add_event_cb(txt_url_firmware, ta_url_form_event, LV_EVENT_VALUE_CHANGED, nullptr);
 
-    sw_ignore_check = lv_switch_create(pnl_firmware);
-    lv_obj_t *lbl_ignore_check_firmware = lv_label_create(pnl_firmware);
-    lv_label_set_text(lbl_ignore_check_firmware, "No verificar la dirección");
-    lv_obj_add_state(sw_ignore_check, LV_STATE_CHECKED);
-    lv_obj_add_state(sw_ignore_check, LV_STATE_DISABLED);
+    sw_enforce_check = lv_switch_create(pnl_firmware);
+    lv_obj_t *lbl_enforce_check_firmware = lv_label_create(pnl_firmware);
+    lv_label_set_text(lbl_enforce_check_firmware, "Verificar el servidor");
+    lv_obj_add_state(sw_enforce_check, LV_STATE_CHECKED);
+    lv_obj_add_state(sw_enforce_check, LV_STATE_DISABLED);
 
     // Botón para actualizar el firmware
     btn_update_firmware = lv_btn_create(pnl_firmware);
@@ -313,8 +316,8 @@ void create_scr_firmware() {
     lv_obj_set_grid_cell(lbl_latest_caption_firmware, LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_CENTER, 2, 1);
     lv_obj_set_grid_cell(lbl_latest_version_firmware, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_CENTER, 2, 1);
     lv_obj_set_grid_cell(txt_url_firmware, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 3, 1);
-    lv_obj_set_grid_cell(sw_ignore_check, LV_GRID_ALIGN_END, 0, 1, LV_GRID_ALIGN_CENTER, 4, 1);
-    lv_obj_set_grid_cell(lbl_ignore_check_firmware, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_CENTER, 4, 1);
+    lv_obj_set_grid_cell(sw_enforce_check, LV_GRID_ALIGN_END, 0, 1, LV_GRID_ALIGN_CENTER, 4, 1);
+    lv_obj_set_grid_cell(lbl_enforce_check_firmware, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_CENTER, 4, 1);
     lv_obj_set_grid_cell(btn_update_firmware, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 5, 1);
     lv_obj_set_grid_cell(btn_cancel_firmware, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 6, 1);
 
