@@ -143,11 +143,13 @@ void notify_ready() {
     set_led_off();
 }
 
-void notify_check_start() {
+void notify_rfid_read() {
     const char* card_melody = "card:d=16,o=5,b=200: g";
     Melody melody = MelodyFactory.loadRtttlString(card_melody);
     player.playAsync(melody);
+}
 
+void notify_check_start() {
     LedAnimationItem anim[] = {
             {
                     .color = Rgb(240, 240, 255),
@@ -206,8 +208,6 @@ void notify_check_error() {
     Melody melody = MelodyFactory.loadRtttlString(card_melody);
     player.playAsync(melody);
 
-
-
     LedAnimationItem anim[] = {
             {
                     .color = Rgb(255, 0, 0),
@@ -245,6 +245,14 @@ void notify_button_press() {
     const char* card_melody = "card:d=16,o=5,b=200: 16e";
     Melody melody = MelodyFactory.loadRtttlString(card_melody);
     player.playAsync(melody);
+}
+
+void notify_stop() {
+    set_led_off();
+}
+
+void notify_firmware_start() {
+    set_led_fixed(Rgb(16, 16, 255));
 }
 
 void set_led_animation(LedAnimationItem items[], int count, Rgb initial_color) {

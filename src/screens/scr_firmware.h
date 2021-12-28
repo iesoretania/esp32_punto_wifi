@@ -17,20 +17,14 @@
 // along with Foobar.  If not, see <https://www.gnu.org/licenses/>.
 //
 
-#ifndef ESP32_PUNTO_WIFI_NOTIFY_H
-#define ESP32_PUNTO_WIFI_NOTIFY_H
+#ifndef ESP32_PUNTO_WIFI_SCR_FIRMWARE_H
+#define ESP32_PUNTO_WIFI_SCR_FIRMWARE_H
 
-void notify_tick();
-void notify_start();
-void notify_ready();
-void notify_rfid_read();
-void notify_check_start();
-void notify_check_success_in();
-void notify_check_success_out();
-void notify_check_error();
-void notify_key_press();
-void notify_button_press();
-void notify_stop();
-void notify_firmware_start();
+extern uint32_t firmware_status;
 
-#endif //ESP32_PUNTO_WIFI_NOTIFY_H
+void do_firmware_upgrade(const char *url);
+void create_scr_firmware();
+void update_scr_firmware();
+void load_scr_firmware();
+
+#endif //ESP32_PUNTO_WIFI_SCR_FIRMWARE_H

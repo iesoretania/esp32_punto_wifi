@@ -151,6 +151,8 @@ void create_scr_login() {
     // Quitar borde al panel y pegarlo a la parte superior de la pantalla
     lv_obj_set_style_border_width(pnl_login, 0, LV_PART_MAIN);
     lv_obj_align(pnl_login, LV_ALIGN_TOP_MID, 0, 0);
+
+    create_config_button(scr_login);
 }
 
 void set_error_login_text(const char *string) {

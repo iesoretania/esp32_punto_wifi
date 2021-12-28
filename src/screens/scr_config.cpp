@@ -24,6 +24,7 @@
 #include "flash.h"
 #include "display.h"
 #include "scr_config.h"
+#include "scr_firmware.h"
 #include "scr_shared.h"
 #include "notify.h"
 
@@ -32,6 +33,8 @@ static lv_obj_t *txt_ssid_config;
 static lv_obj_t *txt_psk_config;
 static lv_obj_t *sld_brillo_config;
 static lv_obj_t *sw_forzar_activacion_config;
+static lv_obj_t *btn_firmware_config;
+static lv_obj_t *lbl_firmware_config;
 
 int configuring = 0;
 
@@ -145,6 +148,20 @@ static void btn_logout_event_cb(lv_event_t *e) {
         flash_erase("CPP-puntToken");
         flash_commit();
         esp_restart();
+    }
+}
+
+static void btn_firmware_config_event_cb(lv_event_t *e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_CLICKED) {
+        lv_label_set_text(lbl_firmware_config, "Comprobando actualizaciones...");
+        lv_obj_add_state(btn_firmware_config, LV_STATE_DISABLED);
+
+        update_scr_firmware();
+        load_scr_firmware();
+
+        lv_label_set_text(lbl_firmware_config, "Actualizar firmware");
+        lv_obj_clear_state(btn_firmware_config, LV_STATE_DISABLED);
     }
 }
 
@@ -354,13 +371,12 @@ void create_scr_config() {
     lv_obj_align(lbl_logout_config, LV_ALIGN_TOP_MID, 0, 0);
 
     // Botón para actualizar el firmware
-    lv_obj_t *btn_update_config = lv_btn_create(tab_seguridad_config);
-    lv_obj_set_height(btn_update_config, LV_SIZE_CONTENT);
-    lv_obj_add_event_cb(btn_update_config, btn_logout_event_cb, LV_EVENT_CLICKED, nullptr);
-    lv_obj_t *lbl_update_config = lv_label_create(btn_update_config);
-    lv_label_set_text(lbl_update_config, "Actualizar firmware");
-    lv_obj_align(lbl_update_config, LV_ALIGN_TOP_MID, 0, 0);
-    lv_obj_add_state(btn_update_config, LV_STATE_DISABLED);
+    btn_firmware_config = lv_btn_create(tab_seguridad_config);
+    lv_obj_set_height(btn_firmware_config, LV_SIZE_CONTENT);
+    lv_obj_add_event_cb(btn_firmware_config, btn_firmware_config_event_cb, LV_EVENT_CLICKED, nullptr);
+    lbl_firmware_config = lv_label_create(btn_firmware_config);
+    lv_label_set_text(lbl_firmware_config, "Actualizar firmware");
+    lv_obj_align(lbl_firmware_config, LV_ALIGN_TOP_MID, 0, 0);
 
     // Colocar elementos en una rejilla (5 filas, 2 columnas)
     static lv_coord_t grid_seguridad_row_dsc[] = {
@@ -381,7 +397,7 @@ void create_scr_config() {
     lv_obj_set_grid_cell(btn_cambio_codigo_config, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 2, 1);
     lv_obj_set_grid_cell(btn_punto_acceso_config, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 3, 1);
     lv_obj_set_grid_cell(btn_logout_config, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 4, 1);
-    lv_obj_set_grid_cell(btn_update_config, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 5, 1);
+    lv_obj_set_grid_cell(btn_firmware_config, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 5, 1);
 }
 
 

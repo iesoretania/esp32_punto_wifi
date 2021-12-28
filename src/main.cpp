@@ -37,6 +37,7 @@
 #include "screens/scr_login.h"
 #include "screens/scr_selection.h"
 #include "screens/scr_config.h"
+#include "screens/scr_firmware.h"
 
 void task_main(lv_timer_t *);
 
@@ -44,12 +45,14 @@ time_t actualiza_hora();
 
 void config_request();
 
+TaskHandle_t notify_task = nullptr;
+
 void task_wifi_connection(lv_timer_t *timer) {
     // Esta tarea es la primera en ejecutarse al arrancar el punto de acceso.
     // Se ejecuta en segundo plano cada 100 ms y es una máquina de estados:
     static enum {
         INIT, CONNECTING, NTP_START, NTP_WAIT, CHECKING, CHECK_WAIT, CHECK_RETRY, LOGIN_SCREEN, WAITING,
-        CONFIG_SCREEN_LOCK, CONFIG_SCREEN, CONFIG_CODE_1, CONFIG_CODE_2, CODE_WAIT, DONE
+        CONFIG_SCREEN_LOCK, CONFIG_SCREEN, CONFIG_CODE_1, CONFIG_CODE_2, CODE_WAIT, FIRMWARE_FLASHING, DONE
     } state = INIT;
 
     static int cuenta = 0;
@@ -61,6 +64,8 @@ void task_wifi_connection(lv_timer_t *timer) {
     static String old_code = "";
 
     String uidS;
+
+    static String url;
 
     switch (state) {
         case DONE:
@@ -84,6 +89,7 @@ void task_wifi_connection(lv_timer_t *timer) {
                 }
                 // si no hay código de activación, mostramos la pantalla de carga y pasamos al estado de conexión
                 state = CONNECTING;
+                notify_start();
                 load_scr_splash();
             }
         case CONNECTING:
@@ -142,9 +148,29 @@ void task_wifi_connection(lv_timer_t *timer) {
         case NTP_WAIT:
             // comprobar si ya estamos en hora. En ese caso, pasar al estado de comprobación de conectividad
             if (sntp_get_sync_status() == SNTP_SYNC_STATUS_COMPLETED) {
-                state = CHECKING;
+                if (flash_get_string("firmware_url").length() > 0) {
+                    state = FIRMWARE_FLASHING;
+                    // no podemos dejar la tarea que ilumina los LEDs, así que dejamos un color fijo
+                    // y la eliminamos. Interfiere e impide la descarga.
+                    notify_firmware_start();
+                    delay(60);
+                    vTaskDelete(notify_task);
+                    url = flash_get_string("firmware_url");
+                    flash_erase("firmware_url");
+                    set_estado_splash("Actualizando firmware...");
+                } else {
+                    state = CHECKING;
+                }
                 cuenta = 0;
             }
+            break;
+        case FIRMWARE_FLASHING:
+            if (cuenta > 10) {
+                if (url.length() > 0) {
+                    do_firmware_upgrade(url.c_str());
+                }
+            }
+            cuenta++;
             break;
         case CHECKING:
             // estado de comprobación de conectividad
@@ -181,7 +207,7 @@ void task_wifi_connection(lv_timer_t *timer) {
                 // no ha habido error, procesar respuesta para obtener todos los datos posibles
                 set_estado_splash("Acceso a Séneca confirmado");
                 process_seneca_response();
-
+                notify_stop();
                 // si "tipo de acceso" contiene algo, es que con las cookies estamos "logueados"
                 if (seneca_get_tipo_acceso().isEmpty()) {
                     if (!seneca_get_punto().isEmpty()) {
@@ -215,6 +241,11 @@ void task_wifi_connection(lv_timer_t *timer) {
             if (is_loaded_scr_splash()) {
                 cuenta = 0;
                 state = CHECKING;
+            }
+            if (configuring) {
+                config_lock_request();
+                state = CONFIG_SCREEN_LOCK;
+                break;
             }
             // si hemos terminado la petición de login, procesarla para ver si ha tenido éxito
             if (seneca_get_request_status() == HTTP_DONE) {
@@ -250,7 +281,7 @@ void task_wifi_connection(lv_timer_t *timer) {
         case CONFIG_SCREEN_LOCK:
             // cuando estamos en este estado, estamos esperando a que se introduzca el código
             // de administración para acceder a la pantalla de configuración
-
+            notify_stop();
             // Comprobar si se ha cerrado la pantalla de introducción del código o se ha acercado un llavero
             uidS = rfid_read_id();
 
@@ -265,6 +296,7 @@ void task_wifi_connection(lv_timer_t *timer) {
                     keypad_done = 0;
                     configuring = 0;
                     state = CONNECTING;
+                    notify_start();
                     load_scr_splash();
                     break;
                 }
@@ -289,6 +321,7 @@ void task_wifi_connection(lv_timer_t *timer) {
             if (!configuring) {
                 load_scr_splash();
                 state = CONNECTING;
+                notify_start();
             }
             break;
         case CONFIG_CODE_1:
@@ -331,6 +364,7 @@ void task_wifi_connection(lv_timer_t *timer) {
                         flash_commit();
                         load_scr_splash();
                         state = CONNECTING;
+                        notify_start();
                         reset_read_code();
                     } else {
                         // no: volver al estado de introducción del primer código
@@ -355,6 +389,7 @@ void task_wifi_connection(lv_timer_t *timer) {
                 if (get_read_code().equals(flash_get_string("sec.code"))) {
                     // sí: pasamos al estado de comprobación de red
                     state = CONNECTING;
+                    notify_start();
                     reset_read_code();
                     load_scr_splash();
                     break;
@@ -447,6 +482,7 @@ void task_main(lv_timer_t *timer) {
                 // ¡hay un código para enviar!
                 if (!uidS.isEmpty()) {
                     // indicar que estamos contactando con Séneca
+                    notify_check_start();
                     set_icon_text_check("\uF252", LV_PALETTE_TEAL, 0, 0);
                     if (llavero) {
                         set_estado_check("Llavero detectado. Comunicando con Séneca, espere por favor...");
@@ -677,8 +713,6 @@ void setup() {
     // Inicializar subsistema HTTP
     initialize_seneca();
 
-    notify_start();
-
     // Crear pantallas y cambiar a la pantalla de arranque
     create_scr_splash();
     create_scr_main();
@@ -687,13 +721,14 @@ void setup() {
     create_scr_selection();
     create_scr_config();
     create_scr_codigo();
+    create_scr_firmware();
 
     // Inicializar WiFi
     set_estado_splash_format("Conectando a %s...", flash_get_string("net.wifi_ssid").c_str());
     WiFi.begin(flash_get_string("net.wifi_ssid").c_str(), flash_get_string("net.wifi_psk").c_str());
 
     // Inicializar luces de estado
-    xTaskCreatePinnedToCore(&xTask_notify, "LED", 4096, nullptr, 10, nullptr, 1);
+    xTaskCreatePinnedToCore(&xTask_notify, "LED", 4096, nullptr, 10, &notify_task, 1);
 
     // Comenzar la conexión a la red
     lv_timer_create(task_wifi_connection, 100, nullptr);

@@ -49,7 +49,7 @@ String rfid_read_id() {
     String uidS;
 
     if (mfrc522.PICC_IsNewCardPresent()) {
-        notify_check_start();
+        notify_rfid_read();
 
         if (mfrc522.PICC_ReadCardSerial()) {
             uint32_t uid = (uint32_t) (
@@ -66,7 +66,7 @@ String rfid_read_id() {
         }
         mfrc522.PICC_HaltA();
     } else if (rdm6300.update()) {
-        notify_check_start();
+        notify_rfid_read();
         uidS = (String) lastTag;
 
         while (uidS.length() < 10) {
