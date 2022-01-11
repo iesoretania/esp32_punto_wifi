@@ -29,10 +29,11 @@
 MFRC522 mfrc522(RFID_SDA_PIN, RFID_RST_PIN);
 Rdm6300 rdm6300;
 uint32_t lastTag;
+bool mfrc522_enabled = false;
 
 void initialize_rfid() {
     SPI.begin();
-    mfrc522.PCD_Init();
+    mfrc522_enabled = mfrc522.PCD_PerformSelfTest();
     rdm6300.begin(RFID_RDM6300_TX, 1);
 }
 
@@ -41,14 +42,14 @@ bool rfid_new_card_detected() {
         lastTag = rdm6300.get_tag_id();
         return true;
     } else {
-        return mfrc522.PICC_IsNewCardPresent();
+        return mfrc522_enabled && mfrc522.PICC_IsNewCardPresent();
     }
 }
 
 String rfid_read_id() {
     String uidS;
 
-    if (mfrc522.PICC_IsNewCardPresent()) {
+    if (mfrc522_enabled && mfrc522.PICC_IsNewCardPresent()) {
         notify_rfid_read();
 
         if (mfrc522.PICC_ReadCardSerial()) {
