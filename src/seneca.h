@@ -27,6 +27,8 @@ typedef enum {
 void initialize_seneca();
 void reset_seneca();
 
+String iso_8859_1_to_utf8(String &str);
+
 void seneca_prepare_request();
 void process_seneca_response();
 int parse_seneca_response();

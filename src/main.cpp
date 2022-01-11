@@ -119,7 +119,7 @@ void task_wifi_connection(lv_timer_t *timer) {
                 // aún no hay conexión. Llevar la cuenta de las décimas de segundo que estamos así
                 cuenta++;
                 // si a los 10 segundos no nos hemos conectado, cambiar el número de versión por el icono de config.
-                if (cuenta % 100 == 0) {
+                if (cuenta == 100) {
                     hide_splash_version();
                     show_splash_config();
                 }
@@ -215,8 +215,8 @@ void task_wifi_connection(lv_timer_t *timer) {
                 // si "tipo de acceso" contiene algo, es que con las cookies estamos "logueados"
                 if (seneca_get_tipo_acceso().isEmpty()) {
                     if (!seneca_get_punto().isEmpty()) {
-                        // si está configurado el punto de acceso, ya estamos listos: indicamos que todo
-                        // bien durante unos segundos y pasamos de pantalla
+                        // si está configurado el punto de acceso, ya estamos listos: lo indicamos
+                        // durante unos segundos y pasamos de pantalla
                         state = WAITING;
                         hide_splash_spinner();
                     } else {
@@ -225,6 +225,7 @@ void task_wifi_connection(lv_timer_t *timer) {
                         load_scr_selection();
                     }
                 } else {
+                    // es necesario hacer login de un directivo o administrativo para obtener la sesión
                     state = LOGIN_SCREEN;
                     seneca_clear_request_status();
                     load_scr_login();
@@ -260,7 +261,7 @@ void task_wifi_connection(lv_timer_t *timer) {
                 String res = seneca_process_json_response();
 
                 if (res.length() > 0) {
-                    set_error_login_text(res.c_str());
+                    set_error_login_text(iso_8859_1_to_utf8(res).c_str());
                 } else {
                     load_scr_splash();
                     cuenta = 0;
@@ -665,7 +666,7 @@ void task_main(lv_timer_t *timer) {
 
 [[noreturn]] void xTask_notify(void *pvParameter) {
     // Esta tarea actualiza el estado de los LEDs
-    while (1) {
+    while (true) {
         delay(50);
         notify_tick();
     }
