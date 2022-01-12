@@ -222,6 +222,7 @@ void task_wifi_connection(lv_timer_t *timer) {
                     } else {
                         // si no está configurado el punto de acceso, pasar el control a la pantalla de selección
                         state = LOGIN_SCREEN;
+                        seneca_clear_request_status();
                         load_scr_selection();
                     }
                 } else {

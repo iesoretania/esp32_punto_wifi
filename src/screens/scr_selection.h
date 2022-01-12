@@ -23,6 +23,6 @@
 void create_scr_selection();
 void load_scr_selection();
 
-void selection_add_punto(String nuevo_punto, const char *data);
+void selection_add_punto(const char *codigo_punto, const char *nombre_punto);
 
 #endif //ESP32_PUNTO_WIFI_SCR_SELECTION_H

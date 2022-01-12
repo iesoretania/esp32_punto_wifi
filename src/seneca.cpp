@@ -51,7 +51,7 @@ String cookieJSESSIONID;
 String cookieSenecaP;
 
 // Estado del parser XML
-String modo, punto, xCentro, nombre_punto, tipo_acceso, nuevo_punto, last_usuario;
+String modo, punto, xCentro, nombre_punto, tipo_acceso, codigo_nuevo_punto, last_usuario;
 
 int isClavePuntoSet = 0;
 
@@ -461,13 +461,13 @@ void xml_html_callback(uint8_t statusflags, char *tagName, uint16_t tagNameLen, 
     // si estamos dentro de una etiqueta <a>, comprobar si es una lista de puntos de control
     if (xmlStatus == 3 && statusflags & STATUS_ATTR_TEXT && !strcasecmp(tagName, "href") &&
     strstr(data, "activarPuntoAcceso")) {
-        nuevo_punto = data;
-        nuevo_punto = nuevo_punto.substring(31, nuevo_punto.indexOf(')') - 1);
+        codigo_nuevo_punto = data;
+        codigo_nuevo_punto = codigo_nuevo_punto.substring(31, codigo_nuevo_punto.indexOf(')') - 1);
     }
 
-    if (xmlStatus == 3 && statusflags & STATUS_TAG_TEXT && !nuevo_punto.isEmpty()) {
-        selection_add_punto(nuevo_punto, data);
-        nuevo_punto = "";
+    if (xmlStatus == 3 && statusflags & STATUS_TAG_TEXT && !codigo_nuevo_punto.isEmpty()) {
+        selection_add_punto(codigo_nuevo_punto.c_str(), data);
+        codigo_nuevo_punto = "";
         xmlStatus = 0;
     }
 

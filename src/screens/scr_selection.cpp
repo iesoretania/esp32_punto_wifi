@@ -41,10 +41,10 @@ static void ta_select_form_event_cb(lv_event_t *e) {
     }
 }
 
-void selection_add_punto(const String nuevo_punto, const char *data) {
-    lv_obj_t *btn = lv_list_add_btn(lst_selection, LV_SYMBOL_WIFI, data);
-    char *item = (char *) lv_mem_alloc(nuevo_punto.length() + 1);
-    strcpy(item, nuevo_punto.c_str());
+void selection_add_punto(const char *codigo_punto, const char *nombre_punto) {
+    lv_obj_t *btn = lv_list_add_btn(lst_selection, LV_SYMBOL_WIFI, nombre_punto);
+    char *item = (char *) lv_mem_alloc(strlen(codigo_punto) + 1);
+    strcpy(item, codigo_punto);
     lv_obj_add_event_cb(btn, ta_select_form_event_cb, LV_EVENT_CLICKED, item);
     lv_obj_add_event_cb(btn, ta_select_form_event_cb, LV_EVENT_DELETE, item);
 }
@@ -57,7 +57,7 @@ void create_scr_selection() {
     // Crear panel del formulario
     pnl_selection = lv_obj_create(scr_selection);
     lv_obj_set_height(pnl_selection, LV_VER_RES);
-    lv_obj_set_width(pnl_selection, lv_pct(90));
+    lv_obj_set_width(pnl_selection, lv_pct(100));
 
     static lv_style_t style_text_muted;
     static lv_style_t style_title;
@@ -85,5 +85,7 @@ void create_scr_selection() {
 }
 
 void load_scr_selection() {
+    Serial.println("1");
     lv_scr_load(scr_selection);
+    Serial.println("2");
 }
