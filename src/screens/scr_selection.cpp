@@ -57,7 +57,7 @@ void create_scr_selection() {
     // Crear panel del formulario
     pnl_selection = lv_obj_create(scr_selection);
     lv_obj_set_height(pnl_selection, LV_VER_RES);
-    lv_obj_set_width(pnl_selection, lv_pct(100));
+    lv_obj_set_width(pnl_selection, lv_pct(90));
 
     static lv_style_t style_text_muted;
     static lv_style_t style_title;
