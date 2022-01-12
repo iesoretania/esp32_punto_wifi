@@ -21,6 +21,7 @@
 #include <esp_http_client.h>
 #include <esp_https_ota.h>
 #include <esp_ota_ops.h>
+#include <esp_task_wdt.h>
 #include "scr_shared.h"
 #include "scr_firmware.h"
 #include "scr_config.h"
@@ -120,6 +121,7 @@ void do_firmware_upgrade(const char *url) {
 
         ota_config.http_config = &config;
 
+        esp_task_wdt_init(20,false);
         esp_err_t ret = esp_https_ota_begin(&ota_config, &https_ota_handle);
 
         if (ret != ESP_OK) {

@@ -706,7 +706,7 @@ void setup() {
     // INICIALIZAR SUBSISTEMAS
 
     // Inicializar puerto serie (para mensajes de depuración)
-    //Serial.begin(115200);
+    Serial.begin(115200);
 
     // Inicializar flash
     initialize_flash();
