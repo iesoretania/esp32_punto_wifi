@@ -33,7 +33,15 @@ bool mfrc522_enabled = false;
 
 void initialize_rfid() {
     SPI.begin();
-    mfrc522_enabled = mfrc522.PCD_PerformSelfTest();
+
+    // Inicializamos el lector RC522 (13.56 MHz)
+    mfrc522.PCD_Init();
+
+    // Obtenemos la versión del lector: si es 0x00 o 0xFF seguramente no hay lector
+    byte version = mfrc522.PCD_ReadRegister(mfrc522.VersionReg);
+    mfrc522_enabled = version != 0x00 && version != 0xFF;
+
+    // Inicializamos lector RDM6300 (125 kHz)
     rdm6300.begin(RFID_RDM6300_TX, 1);
 }
 
