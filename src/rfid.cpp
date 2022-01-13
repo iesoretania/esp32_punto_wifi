@@ -46,8 +46,7 @@ void initialize_rfid() {
 }
 
 bool rfid_new_card_detected() {
-    if (rdm6300.update()) {
-        lastTag = rdm6300.get_tag_id();
+    if (rdm6300._hardware_serial->available() > 0) {
         return true;
     } else {
         return mfrc522_enabled && mfrc522.PICC_IsNewCardPresent();
@@ -74,7 +73,7 @@ String rfid_read_id() {
             }
         }
         mfrc522.PICC_HaltA();
-    } else if (rdm6300.update()) {
+    } else if (rdm6300._hardware_serial->available() > 0 && rdm6300.update()) {
         notify_rfid_read();
         uidS = (String) lastTag;
 
