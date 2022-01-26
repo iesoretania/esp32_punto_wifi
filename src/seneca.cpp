@@ -455,7 +455,8 @@ void xml_html_callback(uint8_t statusflags, char *tagName, uint16_t tagNameLen, 
 
     // si estamos dentro de una etiqueta <h1>, obtener nombre del punto de control
     if (xmlStatus == 2 && statusflags & STATUS_TAG_TEXT) {
-        nombre_punto = data;
+        String nombre = data;
+        nombre_punto = iso_8859_1_to_utf8(nombre);
     }
 
     // si estamos dentro de una etiqueta <a>, comprobar si es una lista de puntos de control
