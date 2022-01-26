@@ -25,18 +25,42 @@ bool Rdm6300::update() {
     char buff[10];
     uint32_t tag_id;
 
+    static int status = 0;
+
     if (!_stream)
         return false;
 
-    if (_stream->available() < 9)
-        return false;
+    size_t count;
 
-    if (9 != _stream->readBytes(buff, 9))
-        return false;
+    switch (status) {
+        case 0:
+            if (_stream->available() == 0) {
+                _last_read_ms = 0;
+                _last_tag_id = 0;
+            }
 
-    /* if a packet doesn't end with the right byte, drop it */
-    if (buff[8] != ' ')
-        return false;
+            while (_stream->available() > 0) {
+                count = _stream->readBytes(buff, 1);
+                if (count == 0) return false;
+
+                if (buff[0] == '\x20') {
+                    status = 1;
+                    break;
+                }
+            }
+            if (status == 0) return false;
+        case 1:
+            if (_stream->available() < 8) return false;
+            count = _stream->readBytes(buff, 8);
+            if (count != 8) return false;
+
+            status = 0;
+
+            while (_stream->available() > 0) _stream->read();
+            break;
+        default:
+            return false;
+    }
 
     /* add null */
     buff[8] = 0;

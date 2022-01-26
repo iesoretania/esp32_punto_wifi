@@ -14,7 +14,7 @@
 
 #define RDM6300_BAUDRATE        9600
 #define RDM6300_READ_TIMEOUT    20
-#define RDM6300_NEXT_READ_MS    100
+#define RDM6300_NEXT_READ_MS    4000
 
 class Rdm6300 {
 public:

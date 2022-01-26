@@ -73,7 +73,7 @@ String rfid_read_id() {
             }
         }
         mfrc522.PICC_HaltA();
-    } else if (rdm6300._hardware_serial->available() > 0 && rdm6300.update()) {
+    } else if (rdm6300.update()) {
         notify_rfid_read();
         uidS = (String) lastTag;
 
