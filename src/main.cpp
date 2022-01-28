@@ -427,6 +427,7 @@ void task_main(lv_timer_t *timer) {
     static String last_pin = "";
     static String pin = "";
     static String uidS;
+    static String last_uidS;
     static time_t last_now = 0;
 
     switch (state) {
@@ -667,6 +668,12 @@ void task_main(lv_timer_t *timer) {
             if (configuring == 0) {
                 state = IDLE;
                 load_scr_main();
+            }
+
+            uidS = rfid_read_id();
+            if (uidS.length() > 0 && !uidS.equals(last_uidS)) {
+                set_config_read_code(uidS);
+                last_uidS = uidS;
             }
     }
 }

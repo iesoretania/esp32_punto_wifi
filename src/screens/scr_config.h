@@ -22,7 +22,7 @@
 
 extern int configuring;
 
-void set_config_read_code(String code);
+void set_config_read_code(const String& code);
 
 void create_scr_config();
 void update_scr_config();

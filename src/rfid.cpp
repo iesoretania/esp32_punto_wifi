@@ -54,7 +54,7 @@ bool rfid_new_card_detected() {
 }
 
 String rfid_read_id() {
-    String uidS;
+    String uidS = "";
 
     if (mfrc522_enabled && mfrc522.PICC_IsNewCardPresent()) {
         notify_rfid_read();

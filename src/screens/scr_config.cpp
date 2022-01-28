@@ -475,6 +475,6 @@ void load_scr_config() {
     lv_scr_load(scr_config);
 }
 
-void set_config_read_code(String code) {
-    lv_textarea_set_text(lbl_read_code, String("Leído: " + code).c_str());
+void set_config_read_code(const String& code) {
+    lv_label_set_text(lbl_read_code, String("Leído: " + code).c_str());
 }
