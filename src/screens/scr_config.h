@@ -22,6 +22,8 @@
 
 extern int configuring;
 
+void set_config_read_code(String code);
+
 void create_scr_config();
 void update_scr_config();
 void load_scr_config();

@@ -35,6 +35,7 @@ static lv_obj_t *sld_brillo_config;
 static lv_obj_t *sw_forzar_activacion_config;
 static lv_obj_t *btn_firmware_config;
 static lv_obj_t *lbl_firmware_config;
+static lv_obj_t *lbl_read_code;
 
 int configuring = 0;
 
@@ -384,13 +385,19 @@ void create_scr_config() {
     lv_obj_t *lbl_forzar_activacion_config = lv_label_create(tab_seguridad_config);
     lv_label_set_text(lbl_forzar_activacion_config, "Activar sólo con codigo");
 
-    // Colocar elementos en una rejilla (5 filas, 2 columnas)
+    lbl_read_code = lv_label_create(tab_red_config);
+    lv_label_set_text(lbl_read_code, "Acerque llavero para leer");
+    lv_obj_set_style_text_align(lbl_read_code, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+    lv_obj_add_style(lbl_read_code, &style_text_muted, LV_PART_MAIN);
+
+    // Colocar elementos en una rejilla (6 filas, 2 columnas)
     static lv_coord_t grid_seguridad_row_dsc[] = {
             LV_GRID_CONTENT,  /* Título */
             LV_GRID_CONTENT,  /* Cambiar código de administración, botón */
             LV_GRID_CONTENT,  /* Cambiar punto de acceso, botón */
             LV_GRID_CONTENT,  /* Cerrar sesión, botón */
             LV_GRID_CONTENT,  /* Forzar activación */
+            LV_GRID_CONTENT,  /* Info código leido */
             LV_GRID_TEMPLATE_LAST
     };
 
@@ -465,4 +472,8 @@ void update_scr_config() {
 
 void load_scr_config() {
     lv_scr_load(scr_config);
+}
+
+void set_config_read_code(String code) {
+    lv_textarea_set_text(lbl_read_code, String("Leído: " + code).c_str());
 }

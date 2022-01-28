@@ -330,6 +330,11 @@ void task_wifi_connection(lv_timer_t *timer) {
                 state = CONNECTING;
                 notify_start();
             }
+
+            if (rfid_new_card_detected()) {
+                set_config_read_code(rfid_read_id());
+            }
+
             break;
         case CONFIG_CODE_1:
             // estamos configurando el código de administrador
