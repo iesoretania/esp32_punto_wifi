@@ -385,7 +385,7 @@ void create_scr_config() {
     lv_obj_t *lbl_forzar_activacion_config = lv_label_create(tab_seguridad_config);
     lv_label_set_text(lbl_forzar_activacion_config, "Activar sólo con codigo");
 
-    lbl_read_code = lv_label_create(tab_red_config);
+    lbl_read_code = lv_label_create(tab_seguridad_config);
     lv_label_set_text(lbl_read_code, "Acerque llavero para leer");
     lv_obj_set_style_text_align(lbl_read_code, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
     lv_obj_add_style(lbl_read_code, &style_text_muted, LV_PART_MAIN);
@@ -409,6 +409,7 @@ void create_scr_config() {
     lv_obj_set_grid_cell(btn_logout_config, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 3, 1);
     lv_obj_set_grid_cell(sw_forzar_activacion_config, LV_GRID_ALIGN_END, 0, 1, LV_GRID_ALIGN_CENTER, 4, 1);
     lv_obj_set_grid_cell(lbl_forzar_activacion_config, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_CENTER, 4, 1);
+    lv_obj_set_grid_cell(lbl_read_code, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_CENTER, 5, 1);
 
     // PANEL DE CONFIGURACIÓN DE FIRMWARE
     lv_obj_set_style_pad_left(tab_firmware_config, LV_HOR_RES * 8 / 100, 0);

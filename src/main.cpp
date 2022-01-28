@@ -331,7 +331,8 @@ void task_wifi_connection(lv_timer_t *timer) {
                 notify_start();
             }
 
-            if (rfid_new_card_detected()) {
+            uidS = rfid_read_id();
+            if (uidS.length() > 0) {
                 set_config_read_code(rfid_read_id());
             }
 
