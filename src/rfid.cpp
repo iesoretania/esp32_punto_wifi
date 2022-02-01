@@ -75,7 +75,7 @@ String rfid_read_id() {
         mfrc522.PICC_HaltA();
     } else if (rdm6300.update()) {
         notify_rfid_read();
-        uidS = (String) lastTag;
+        uidS = (String) rdm6300.get_tag_id();
 
         while (uidS.length() < 10) {
             uidS = "0" + uidS;

@@ -69,15 +69,15 @@ bool Rdm6300::update() {
     /* if a new tag appears- return it */
     if (_last_tag_id != tag_id) {
         _last_tag_id = tag_id;
-        _last_read_ms = 0;
-    }
-    /* if the old tag is still here set tag_id to zero */
-    if (is_tag_near())
-        tag_id = 0;
-    _last_read_ms = millis();
+        _last_read_ms = millis();
+        _tag_id = tag_id;
+        return true;
+    } else {
+        if (!is_tag_near())
+            _last_tag_id = 0;
 
-    _tag_id = tag_id;
-    return tag_id;
+        return false;
+    }
 }
 
 bool Rdm6300::is_tag_near() {
@@ -86,6 +86,5 @@ bool Rdm6300::is_tag_near() {
 
 uint32_t Rdm6300::get_tag_id() {
     uint32_t tag_id = _tag_id;
-    _tag_id = 0;
     return tag_id;
 }
