@@ -26,7 +26,7 @@ void Rdm6300::clear() {
 }
 
 bool Rdm6300::update() {
-    char buff[10];
+    char buff[20];
     uint32_t tag_id;
 
     static int status = 0;
@@ -55,9 +55,9 @@ bool Rdm6300::update() {
             if (status == 0) return false;
         case 1:
 
-            if (_stream->available() < 8) return false;
-            count = _stream->readBytes(buff, 8);
-            if (count != 8) return false;
+            if (_stream->available() < 10) return false;
+            count = _stream->readBytes(buff, 10);
+            if (count != 10) return false;
 
             status = 0;
 
@@ -68,8 +68,8 @@ bool Rdm6300::update() {
     }
 
     /* add null */
-    buff[8] = 0;
-    tag_id = strtol(buff, NULL, 16);
+    buff[10] = 0;
+    tag_id = strtol(&buff[2], nullptr, 16);
 
     /* if a new tag appears- return it */
     if (_last_tag_id != tag_id) {
