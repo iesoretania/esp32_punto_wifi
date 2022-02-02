@@ -18,9 +18,10 @@ cualquier superficie.
 
 ¿Quién lo ha diseñado?
 ----------------------
-Profesorado del I.E.S. Oretania de Linares (Jaén). El centro ha participado en el programa
-piloto de control de presencia de la Consejería y pone a disposición de la comunidad
-educativa el desarrollo completo, tanto el software como el hardware.
+Profesorado del [I.E.S. Oretania de Linares (Jaén)](https://iesoretania.es).
+El centro ha participado en el programa piloto de control de presencia de la Consejería y 
+pone a disposición de la comunidad educativa el desarrollo completo, tanto el software como
+el hardware.
 
 ¿Qué se necesita?
 -----------------
