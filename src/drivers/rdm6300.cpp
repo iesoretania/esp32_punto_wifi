@@ -21,6 +21,10 @@ void Rdm6300::end() {
         _hardware_serial->end();
 }
 
+void Rdm6300::clear() {
+    while (_stream->available() > 0) _stream->read();
+}
+
 bool Rdm6300::update() {
     char buff[10];
     uint32_t tag_id;
@@ -32,13 +36,12 @@ bool Rdm6300::update() {
 
     size_t count;
 
+    if (_stream->available() == 0) {
+        _last_tag_id = 0;
+    }
+
     switch (status) {
         case 0:
-            if (_stream->available() == 0) {
-                _last_read_ms = 0;
-                _last_tag_id = 0;
-            }
-
             while (_stream->available() > 0) {
                 count = _stream->readBytes(buff, 1);
                 if (count == 0) return false;
@@ -48,8 +51,10 @@ bool Rdm6300::update() {
                     break;
                 }
             }
+
             if (status == 0) return false;
         case 1:
+
             if (_stream->available() < 8) return false;
             count = _stream->readBytes(buff, 8);
             if (count != 8) return false;
@@ -69,19 +74,10 @@ bool Rdm6300::update() {
     /* if a new tag appears- return it */
     if (_last_tag_id != tag_id) {
         _last_tag_id = tag_id;
-        _last_read_ms = millis();
         _tag_id = tag_id;
         return true;
-    } else {
-        if (!is_tag_near())
-            _last_tag_id = 0;
-
-        return false;
     }
-}
-
-bool Rdm6300::is_tag_near() {
-    return millis() - _last_read_ms < RDM6300_NEXT_READ_MS;
+    return false;
 }
 
 uint32_t Rdm6300::get_tag_id() {

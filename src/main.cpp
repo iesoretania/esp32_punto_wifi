@@ -333,7 +333,7 @@ void task_wifi_connection(lv_timer_t *timer) {
 
             uidS = rfid_read_id();
             if (uidS.length() > 0) {
-                set_config_read_code(rfid_read_id());
+                set_config_read_code(uidS);
             }
 
             break;

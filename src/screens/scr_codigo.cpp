@@ -20,6 +20,7 @@
 #include <lvgl.h>
 #include "scr_codigo.h"
 #include "notify.h"
+#include "rfid.h"
 
 static lv_obj_t *scr_codigo;     // Pantalla de introducción de código manual
 static lv_obj_t *lbl_estado_codigo;
@@ -156,6 +157,7 @@ void keypad_request(const char *mensaje) {
     keypad_requested = 0;
     keypad_done = 0;
     read_code = "";
+    rfid_clear();
     set_estado_codigo(mensaje);
     lv_textarea_set_text(txt_codigo, "");
     lv_scr_load(scr_codigo);

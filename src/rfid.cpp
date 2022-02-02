@@ -83,3 +83,7 @@ String rfid_read_id() {
     }
     return uidS;
 }
+
+void rfid_clear() {
+    rdm6300.clear();
+}

@@ -25,5 +25,6 @@
 void initialize_rfid();
 String rfid_read_id();
 bool rfid_new_card_detected();
+void rfid_clear();
 
 #endif //ESP32_PUNTO_WIFI_RFID_H
