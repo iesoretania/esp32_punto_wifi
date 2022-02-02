@@ -74,7 +74,12 @@ La opción para hacerlo está en la pestaña "Firmware" del menú de configuraci
 
 Cómo cargar el firmware inicial en una placa ESP32-DevKitC
 ----------------------------------------------------------
+
+**Importante: Si usas el lector de 125 kHz (RDM6300), desconéctalo de la placa antes de programar, pues
+si está conectado se impedirá la programación del firmware.**
+
 ### Obligatorio salvo en Linux: Instalación de drivers USB
+
 Independientemente del método a utilizar, para programar el dispositivo es necesario que los controladores
 USB estén correctamente instalados en el sistema operativo.
 
