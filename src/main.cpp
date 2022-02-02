@@ -56,6 +56,7 @@ void task_wifi_connection(lv_timer_t *timer) {
     } state = INIT;
 
     static int cuenta = 0;
+    static boolean firmware_update = false;
     static int code;
     IPAddress ip;
 
@@ -156,6 +157,7 @@ void task_wifi_connection(lv_timer_t *timer) {
                 // cambiar el logo por el de Séneca y comprobar si estamos actualizando el firmware
                 change_logo_splash();
                 if (flash_get_string("firmware_url").length() > 0) {
+                    firmware_update = true;
                     state = FIRMWARE_FLASHING;
                     // no podemos dejar la tarea que ilumina los LEDs, así que dejamos un color fijo
                     // y la eliminamos. Interfiere e impide la descarga.
@@ -178,6 +180,7 @@ void task_wifi_connection(lv_timer_t *timer) {
             break;
         case CHECKING:
             // estado de comprobación de conectividad
+            if (firmware_update) break;
             set_estado_splash("Comprobando acceso a Séneca...");
 
             // mandaremos una petición "vacía" a la aplicación de control de presencia de Séneca
@@ -198,6 +201,7 @@ void task_wifi_connection(lv_timer_t *timer) {
             break;
         case CHECK_WAIT:
             // esperar hasta obtener la respuesta
+            if (firmware_update) break;
             if (seneca_get_request_status() == HTTP_ONGOING) {
                 break;
             }
