@@ -77,7 +77,11 @@ Cómo cargar el firmware inicial en una placa ESP32-DevKitC
 ----------------------------------------------------------
 
 **Importante: Si usas el lector de 125 kHz (RDM6300), desconéctalo de la placa antes de programar, pues
-si está conectado se impedirá la programación del firmware.**
+si está conectado se impedirá la programación del firmware. También puede dar
+problemas la lectura o los cambios de la configuración en la flash. Hay
+que escribir el comando `espefuse.py set_flash_voltage 3.3V` 
+y confirmar los cambios para evitar estos problemas y poder dejar el lector
+conectado de forma permanente.**
 
 ### Obligatorio salvo en Linux: Instalación de drivers USB
 
