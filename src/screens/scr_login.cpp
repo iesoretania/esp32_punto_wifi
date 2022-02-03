@@ -146,12 +146,13 @@ void create_scr_login() {
     lv_obj_set_grid_cell(lbl_password_login, LV_GRID_ALIGN_START, 0, 1, LV_GRID_ALIGN_CENTER, 4, 1);
     lv_obj_set_grid_cell(txt_password_login, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_START, 4, 1);
     lv_obj_set_grid_cell(btn_login, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_START, 6, 1);
-    lv_obj_set_grid_cell(lbl_error_login, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_START, 9, 1);
+    lv_obj_set_grid_cell(lbl_error_login, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_START, 8, 1);
 
     // Quitar borde al panel y pegarlo a la parte superior de la pantalla
     lv_obj_set_style_border_width(pnl_login, 0, LV_PART_MAIN);
     lv_obj_align(pnl_login, LV_ALIGN_TOP_MID, 0, 0);
 
+    lv_obj_clear_flag(pnl_login, LV_OBJ_FLAG_SCROLLABLE);
     create_config_button(scr_login);
 }
 
