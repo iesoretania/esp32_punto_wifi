@@ -29,6 +29,7 @@
 #include "notify.h"
 
 static lv_obj_t *scr_config;     // Pantalla de configuración
+static lv_obj_t *tabview_config;
 static lv_obj_t *txt_ssid_config;
 static lv_obj_t *txt_psk_config;
 static lv_obj_t *sld_brillo_config;
@@ -190,7 +191,6 @@ void create_scr_config() {
     lv_style_set_text_opa(&style_text_muted, LV_OPA_50);
 
     // Crear pestañas
-    lv_obj_t *tabview_config;
     tabview_config = lv_tabview_create(scr_config, LV_DIR_TOP, 50);
     lv_obj_add_event_cb(lv_tabview_get_content(tabview_config), scroll_begin_event_cb, LV_EVENT_SCROLL_BEGIN, nullptr);
 
@@ -452,7 +452,10 @@ void create_scr_config() {
 
 void update_scr_config() {
     lv_textarea_set_text(txt_ssid_config, flash_get_string("net.wifi_ssid").c_str());
+    int old_value = lv_textarea_get_password_show_time(txt_psk_config);
+    lv_textarea_set_password_show_time(txt_psk_config, 0);
     lv_textarea_set_text(txt_psk_config, flash_get_string("net.wifi_psk").c_str());
+    lv_textarea_set_password_show_time(txt_psk_config, old_value);
 
     // Brillo de la pantalla
     uint64_t brillo = flash_get_int("scr.brightness");
@@ -466,12 +469,13 @@ void update_scr_config() {
     } else {
         lv_obj_clear_state(sw_forzar_activacion_config, LV_STATE_CHECKED);
     }
-
-    // Comenzar en la primera página
-    lv_obj_scroll_to_view_recursive(txt_ssid_config, LV_ANIM_OFF);
 }
 
 void load_scr_config() {
+    // Comenzar en la primera página
+    lv_tabview_set_act(tabview_config, 0, LV_ANIM_OFF);
+    lv_obj_scroll_to_view_recursive(txt_ssid_config, LV_ANIM_OFF);
+
     lv_scr_load(scr_config);
 }
 
