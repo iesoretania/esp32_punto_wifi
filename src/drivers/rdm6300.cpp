@@ -43,15 +43,11 @@ bool Rdm6300::update() {
     switch (status) {
         case 0:
             while (_stream->available() > 0) {
-                count = _stream->readBytes(buff, 1);
-                if (count == 0) return false;
-
-                if (buff[0] == '\x20') {
+                if (_stream->read() == '\x20') {
                     status = 1;
                     break;
                 }
             }
-
             if (status == 0) return false;
         case 1:
 
@@ -61,7 +57,6 @@ bool Rdm6300::update() {
 
             status = 0;
 
-            while (_stream->available() > 0) _stream->read();
             break;
         default:
             return false;
