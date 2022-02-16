@@ -36,15 +36,15 @@ El ESP32 es sólo una pieza de todo el sistema: estará conectado a una pantalla
    * `3.5" 480*320 SPI Serial TFT LCD Module Display Screen with Touch Panel. Driver ILI9488`
 
 2. El lector RFID permitirá usar llaveros o tarjetas. El diseño actual soporta tanto la tecnología
-   de 13.56 MHz como de 125 kHz, dependiendo del tipo de lector instalado. Pueden montarse ambos
-   simultánemente, pero la caja está diseñada para albergar solamente una de las antenas.
+   de 13.56 MHz como de 125 kHz, dependiendo del tipo de lector instalado. No se soportan ambos
+   lectores simultáneamente.
    * `RC522 Antenna RFID SPI IC Wireless Module` (13.56 MHz)
    * `125Khz RFID Reader Module RDM6300 UART Output Access Control System` (125 kHz)
 
-3. El zumbador, o buzzer, proporcionará una respuesta acústica a cada acción de fichaje.
+4. El zumbador, o buzzer, proporcionará una respuesta acústica a cada acción de fichaje.
    * `3.3V Passive Buzzer`
    
-4. Un LED multicolor, mostrará distintos tonos en función del estado o el resultado del envío del código
+5. Un LED multicolor, mostrará distintos tonos en función del estado o el resultado del envío del código
    * `WS2812 RGB LED Breakout module` (1 único LED, recomendado) o cualquier otro compatible hasta 8 LEDs.
 
 6. Todo lo anterior estará interconectado con una placa de circuito impreso o PCB. Más abajo se enlazará

@@ -28,7 +28,7 @@
 
 MFRC522 mfrc522(RFID_SDA_PIN, RFID_RST_PIN);
 Rdm6300 rdm6300;
-uint32_t lastTag;
+
 bool mfrc522_enabled = false;
 
 void initialize_rfid() {
@@ -42,11 +42,11 @@ void initialize_rfid() {
     mfrc522_enabled = version != 0x00 && version != 0xFF;
 
     // Inicializamos lector RDM6300 (125 kHz)
-    rdm6300.begin(RFID_RDM6300_TX, 1);
+    if (!mfrc522_enabled) rdm6300.begin(RFID_RDM6300_TX, 1);
 }
 
 bool rfid_new_card_detected() {
-    if (rdm6300._hardware_serial->available() > 0) {
+    if (!mfrc522_enabled && rdm6300._hardware_serial->available() > 0) {
         return true;
     } else {
         return mfrc522_enabled && mfrc522.PICC_IsNewCardPresent();
@@ -85,5 +85,5 @@ String rfid_read_id() {
 }
 
 void rfid_clear() {
-    rdm6300.clear();
+    if (!mfrc522_enabled) rdm6300.clear();
 }
