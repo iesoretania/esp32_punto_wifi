@@ -55,7 +55,7 @@ bool rfid_new_card_detected() {
             bool ret = mfrc522.PICC_IsNewCardPresent();
             if (!ret) {
                 count++;
-                if (count > 10000) {
+                if (count > 100) {
                     mfrc522.PCD_Reset();
                     count = 0;
                 }
