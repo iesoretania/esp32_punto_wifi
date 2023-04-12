@@ -35,10 +35,10 @@ void initialize_flash() {
         delay(1000);
         erase_flash = digitalRead(0) != HIGH;
     }
-    if (NVS.getInt("PUNTO_CONTROL") != 3 || erase_flash) {
+    if (NVS.getInt("PUNTO_CONTROL") != 4 || erase_flash) {
         // borrando flash
         NVS.eraseAll(false);
-        NVS.setInt("PUNTO_CONTROL", 3);
+        NVS.setInt("PUNTO_CONTROL", 4);
         NVS.setString("CPP-authToken", "");
         NVS.setString("CPP-puntToken", "");
         // configuración por defecto de la WiFi
