@@ -109,7 +109,7 @@ void task_wifi_connection(lv_timer_t *timer) {
             if (WiFi.status() == WL_CONNECTED) {
                 state = NTP_START;
                 set_ip_splash_format("IP: %s", WiFi.localIP().toString().c_str());
-                set_estado_splash("Comprobando conectividad Andared...");
+                set_estado_splash("Comprobando conectividad...");
 
                 // intentamos resolver "c0" por DNS. Si tiene éxito, suponemos que estamos conectados
                 // a la red corporativa desde un centro educativo y usamos como servidor NTP c0.
