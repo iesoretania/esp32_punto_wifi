@@ -46,20 +46,11 @@ void initialize_rfid() {
 }
 
 bool rfid_new_card_detected() {
-    static int count = 0;
-
     if (!mfrc522_enabled && rdm6300._hardware_serial->available() > 0) {
         return true;
     } else {
         if (mfrc522_enabled) {
             bool ret = mfrc522.PICC_IsNewCardPresent();
-            if (!ret) {
-                count++;
-                if (count > 100) {
-                    mfrc522.PCD_Reset();
-                    count = 0;
-                }
-            }
             return ret;
         }
         return false;

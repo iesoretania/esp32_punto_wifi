@@ -724,11 +724,11 @@ void setup() {
     // Inicializar flash
     initialize_flash();
 
-    // Inicializar lector
-    initialize_rfid();
-
     // Inicializar GUI
     initialize_gui();
+
+    // Inicializar lector
+    initialize_rfid();
 
     // Inicializar subsistema HTTP
     initialize_seneca();
